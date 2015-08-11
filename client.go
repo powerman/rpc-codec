@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package jsonrpc implements a JSON-RPC ClientCodec and ServerCodec
+// Package jsonrpc2 implements a JSON-RPC 2.0 ClientCodec and ServerCodec
 // for the rpc package.
-package jsonrpc
+package jsonrpc2
 
 import (
 	"encoding/json"
