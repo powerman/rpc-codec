@@ -43,15 +43,17 @@ func NewClientCodec(conn io.ReadWriteCloser) rpc.ClientCodec {
 }
 
 type clientRequest struct {
-	Method string         `json:"method"`
-	Params [1]interface{} `json:"params"`
-	Id     uint64         `json:"id"`
+	Version string         `json:"jsonrpc"`
+	Method  string         `json:"method"`
+	Params  [1]interface{} `json:"params"`
+	Id      uint64         `json:"id"`
 }
 
 func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
 	c.mutex.Lock()
 	c.pending[r.Seq] = r.ServiceMethod
 	c.mutex.Unlock()
+	c.req.Version = "2.0"
 	c.req.Method = r.ServiceMethod
 	c.req.Params[0] = param
 	c.req.Id = r.Seq

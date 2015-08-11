@@ -44,21 +44,24 @@ func NewServerCodec(conn io.ReadWriteCloser) rpc.ServerCodec {
 }
 
 type serverRequest struct {
-	Method string           `json:"method"`
-	Params *json.RawMessage `json:"params"`
-	Id     *json.RawMessage `json:"id"`
+	Version string           `json:"jsonrpc"`
+	Method  string           `json:"method"`
+	Params  *json.RawMessage `json:"params"`
+	Id      *json.RawMessage `json:"id"`
 }
 
 func (r *serverRequest) reset() {
+	r.Version = ""
 	r.Method = ""
 	r.Params = nil
 	r.Id = nil
 }
 
 type serverResponse struct {
-	Id     *json.RawMessage `json:"id"`
-	Result interface{}      `json:"result"`
-	Error  interface{}      `json:"error"`
+	Version string           `json:"jsonrpc"`
+	Id      *json.RawMessage `json:"id"`
+	Result  interface{}      `json:"result"`
+	Error   interface{}      `json:"error"`
 }
 
 func (c *serverCodec) ReadRequestHeader(r *rpc.Request) error {
@@ -113,7 +116,7 @@ func (c *serverCodec) WriteResponse(r *rpc.Response, x interface{}) error {
 		// Invalid request so no id.  Use JSON null.
 		b = &null
 	}
-	resp := serverResponse{Id: b}
+	resp := serverResponse{Version: "2.0", Id: b}
 	if r.Error == "" {
 		resp.Result = x
 	} else {
