@@ -12,8 +12,6 @@ import (
 	"sync"
 )
 
-var errMissingParams = errors.New("jsonrpc: request body missing params")
-
 type serverCodec struct {
 	dec *json.Decoder // for reading JSON values
 	enc *json.Encoder // for writing JSON values
@@ -60,15 +58,73 @@ func (r *serverRequest) reset() {
 type serverResponse struct {
 	Version string           `json:"jsonrpc"`
 	Id      *json.RawMessage `json:"id"`
-	Result  interface{}      `json:"result"`
-	Error   interface{}      `json:"error"`
+	Result  interface{}      `json:"result,omitempty"`
+	Error   interface{}      `json:"error,omitempty"`
 }
 
-func (c *serverCodec) ReadRequestHeader(r *rpc.Request) error {
-	c.req.reset()
-	if err := c.dec.Decode(&c.req); err != nil {
+func (c *serverCodec) ReadRequestHeader(r *rpc.Request) (err error) {
+	// If return error:
+	// - codec will be closed
+	// So, try to send error reply to client before returning error.
+	var raw json.RawMessage
+	if err := c.dec.Decode(&raw); err != nil {
+		if _, ok := err.(*json.SyntaxError); ok {
+			c.enc.Encode(serverResponse{Version: "2.0", Id: &null, Error: errParse})
+		}
 		return err
 	}
+	defer func() {
+		if err != nil {
+			c.enc.Encode(serverResponse{Version: "2.0", Id: &null, Error: errRequest})
+		}
+	}()
+
+	var rawMap = make(map[string]*json.RawMessage)
+	if err := json.Unmarshal(raw, &rawMap); err != nil { // TODO batch
+		return err
+	}
+	if len(rawMap) < 2 || len(rawMap) > 4 {
+		return errors.New("bad request")
+	}
+	if rawMap["jsonrpc"] == nil {
+		return errors.New("bad request")
+	}
+	if rawMap["method"] == nil {
+		return errors.New("bad request")
+	}
+	_, okId := rawMap["id"]
+	_, okParams := rawMap["params"]
+	if len(rawMap) == 3 && (!okId && !okParams) || len(rawMap) == 4 && (!okId || !okParams) {
+		return errors.New("bad request")
+	}
+
+	c.req.reset()
+	if err := json.Unmarshal(raw, &c.req); err != nil {
+		return err
+	}
+	if c.req.Version != "2.0" {
+		return errors.New("bad request")
+	}
+	if c.req.Params == nil && okParams {
+		return errors.New("bad request")
+	}
+	if c.req.Params != nil && len(*c.req.Params) > 0 {
+		switch []byte(*c.req.Params)[0] {
+		case '[': // TODO by-name params
+		default:
+			return errors.New("bad request")
+		}
+	}
+	if c.req.Id == nil && !okId { // TODO notification
+		return errors.New("bad request")
+	}
+	if c.req.Id != nil && len(*c.req.Id) > 0 {
+		switch []byte(*c.req.Id)[0] {
+		case 't', 'f', '{', '[':
+			return errors.New("bad request")
+		}
+	}
+
 	r.ServiceMethod = c.req.Method
 
 	// JSON request id can be any JSON value;
@@ -85,11 +141,13 @@ func (c *serverCodec) ReadRequestHeader(r *rpc.Request) error {
 }
 
 func (c *serverCodec) ReadRequestBody(x interface{}) error {
+	// If x!=nil and return error e:
+	// - WriteResponse() will be called with e.Error() in r.Error
 	if x == nil {
 		return nil
 	}
 	if c.req.Params == nil {
-		return errMissingParams
+		return nil
 	}
 	// JSON params is array value.
 	// RPC params is struct.
@@ -97,12 +155,19 @@ func (c *serverCodec) ReadRequestBody(x interface{}) error {
 	// Should think about making RPC more general.
 	var params [1]interface{}
 	params[0] = x
-	return json.Unmarshal(*c.req.Params, &params)
+	if err := json.Unmarshal(*c.req.Params, &params); err != nil {
+		return NewError(errParams.Code, err.Error())
+	}
+	return nil
 }
 
 var null = json.RawMessage([]byte("null"))
 
 func (c *serverCodec) WriteResponse(r *rpc.Response, x interface{}) error {
+	// If return error: nothing happens.
+	// In r.Error will be "" or .Error() of error returned by:
+	// - ReadRequestBody()
+	// - called RPC method
 	c.mutex.Lock()
 	b, ok := c.pending[r.Seq]
 	if !ok {
@@ -118,9 +183,21 @@ func (c *serverCodec) WriteResponse(r *rpc.Response, x interface{}) error {
 	}
 	resp := serverResponse{Version: "2.0", Id: b}
 	if r.Error == "" {
-		resp.Result = x
+		if x == nil {
+			resp.Result = &null
+		} else {
+			resp.Result = x
+		}
+	} else if r.Error[0] == '{' && r.Error[len(r.Error)-1] == '}' {
+		// Well… this check for '{'…'}' isn't too strict, but I
+		// suppose we're trusting our own RPC methods (this way they
+		// can force sending wrong reply or many replies instead
+		// of one) and normal errors won't be formatted this way.
+		raw := json.RawMessage(r.Error)
+		resp.Error = &raw
 	} else {
-		resp.Error = r.Error
+		raw := json.RawMessage(newError(r.Error).Error())
+		resp.Error = &raw
 	}
 	return c.enc.Encode(resp)
 }

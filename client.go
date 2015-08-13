@@ -8,7 +8,6 @@ package jsonrpc2
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net"
 	"net/rpc"
@@ -50,6 +49,7 @@ type clientRequest struct {
 }
 
 func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
+	// If return error: it will be returned as is for this call.
 	c.mutex.Lock()
 	c.pending[r.Seq] = r.ServiceMethod
 	c.mutex.Unlock()
@@ -57,25 +57,93 @@ func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
 	c.req.Method = r.ServiceMethod
 	c.req.Params[0] = param
 	c.req.Id = r.Seq
-	return c.enc.Encode(&c.req)
+	if err := c.enc.Encode(&c.req); err != nil {
+		return NewError(errInternal.Code, err.Error())
+	}
+	return nil
 }
 
 type clientResponse struct {
-	Id     uint64           `json:"id"`
-	Result *json.RawMessage `json:"result"`
-	Error  interface{}      `json:"error"`
+	Version string           `json:"jsonrpc"`
+	Id      uint64           `json:"id"`
+	Result  *json.RawMessage `json:"result"`
+	Error   *Error           `json:"error"`
 }
 
 func (r *clientResponse) reset() {
+	r.Version = ""
 	r.Id = 0
 	r.Result = nil
 	r.Error = nil
 }
 
 func (c *clientCodec) ReadResponseHeader(r *rpc.Response) error {
+	// If return err:
+	// - io.EOF will became ErrShutdown or io.ErrUnexpectedEOF
+	// - it will be returned as is for all pending calls
+	// - client will be shutdown
+	// So, return io.EOF as is, return *Error for all other errors.
+	var raw json.RawMessage
+	if err := c.dec.Decode(&raw); err != nil {
+		if err == io.EOF {
+			return err
+		}
+		return NewError(errInternal.Code, err.Error())
+	}
+
+	var rawMap = make(map[string]*json.RawMessage)
+	if err := json.Unmarshal(raw, &rawMap); err != nil {
+		return NewError(errInternal.Code, "bad response: "+string(raw))
+	}
+	if len(rawMap) != 3 {
+		return NewError(errInternal.Code, "bad response: "+string(raw))
+	}
+	if rawMap["jsonrpc"] == nil {
+		return NewError(errInternal.Code, "bad response: "+string(raw))
+	}
+	if _, ok := rawMap["id"]; !ok {
+		return NewError(errInternal.Code, "bad response: "+string(raw))
+	}
+
 	c.resp.reset()
-	if err := c.dec.Decode(&c.resp); err != nil {
-		return err
+	if err := json.Unmarshal(raw, &c.resp); err != nil {
+		return NewError(errInternal.Code, "bad response: "+string(raw))
+	}
+	if c.resp.Version != "2.0" {
+		return NewError(errInternal.Code, "bad response: "+string(raw))
+	}
+	if _, ok := rawMap["result"]; ok && c.resp.Result == nil {
+		c.resp.Result = &null
+	}
+	if c.resp.Result == nil && c.resp.Error == nil || c.resp.Result != nil && c.resp.Error != nil {
+		return NewError(errInternal.Code, "bad response: "+string(raw))
+	}
+	if c.resp.Error != nil {
+		if rawMap["error"] == nil {
+			return NewError(errInternal.Code, "bad response: "+string(raw))
+		}
+		rawErrMap := make(map[string]*json.RawMessage)
+		if err := json.Unmarshal(*rawMap["error"], &rawErrMap); err != nil {
+			return NewError(errInternal.Code, "bad response: "+string(raw))
+		}
+		if len(rawErrMap) < 2 || len(rawErrMap) > 4 {
+			return NewError(errInternal.Code, "bad response: "+string(raw))
+		}
+		if rawErrMap["code"] == nil {
+			return NewError(errInternal.Code, "bad response: "+string(raw))
+		}
+		if rawErrMap["message"] == nil {
+			return NewError(errInternal.Code, "bad response: "+string(raw))
+		}
+		if _, ok := rawErrMap["data"]; len(rawErrMap) == 3 && !ok {
+			return NewError(errInternal.Code, "bad response: "+string(raw))
+		}
+	}
+	if rawMap["id"] == nil {
+		if c.resp.Error != nil {
+			return c.resp.Error
+		}
+		return NewError(errInternal.Code, "bad response: "+string(raw))
 	}
 
 	c.mutex.Lock()
@@ -85,24 +153,23 @@ func (c *clientCodec) ReadResponseHeader(r *rpc.Response) error {
 
 	r.Error = ""
 	r.Seq = c.resp.Id
-	if c.resp.Error != nil || c.resp.Result == nil {
-		x, ok := c.resp.Error.(string)
-		if !ok {
-			return fmt.Errorf("invalid error %v", c.resp.Error)
-		}
-		if x == "" {
-			x = "unspecified error"
-		}
-		r.Error = x
+	if c.resp.Error != nil {
+		r.Error = c.resp.Error.Error()
 	}
 	return nil
 }
 
 func (c *clientCodec) ReadResponseBody(x interface{}) error {
+	// If x!=nil and return error e:
+	// - this call get e.Error() appended to "reading body "
+	// - other pending calls get error as is
 	if x == nil {
 		return nil
 	}
-	return json.Unmarshal(*c.resp.Result, x)
+	if err := json.Unmarshal(*c.resp.Result, x); err != nil {
+		return NewError(errInternal.Code, err.Error())
+	}
+	return nil
 }
 
 func (c *clientCodec) Close() error {

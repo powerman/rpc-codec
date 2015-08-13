@@ -99,7 +99,7 @@ func TestServer(t *testing.T) {
 
 	// Send hand-coded requests to server, parse responses.
 	for i := 0; i < 10; i++ {
-		fmt.Fprintf(cli, `{"method": "Arith.Add", "id": "\u%04d", "params": [{"A": %d, "B": %d}]}`, i, i, i+1)
+		fmt.Fprintf(cli, `{"jsonrpc": "2.0", "method": "Arith.Add", "id": "\u%04d", "params": [{"A": %d, "B": %d}]}`, i, i, i+1)
 		var resp ArithAddResp
 		err := dec.Decode(&resp)
 		if err != nil {
@@ -177,15 +177,18 @@ func TestClient(t *testing.T) {
 	// expect an error: zero divide
 	if err == nil {
 		t.Error("Div: expected error")
-	} else if err.Error() != "divide by zero" {
+	} else if ServerError(err).Message != "divide by zero" {
 		t.Error("Div: expected divide by zero error; got", err)
 	}
 }
 
 func TestMalformedInput(t *testing.T) {
 	cli, srv := net.Pipe()
-	go cli.Write([]byte(`{id:1}`)) // invalid json
-	ServeConn(srv)                 // must return, not loop
+	go func() {
+		cli.Write([]byte(`{id:1}`)) // invalid json
+		cli.Read(make([]byte, 1024))
+	}()
+	ServeConn(srv) // must return, not loop
 }
 
 func TestMalformedOutput(t *testing.T) {
@@ -211,7 +214,7 @@ func TestServerErrorHasNullResult(t *testing.T) {
 		io.Writer
 		io.Closer
 	}{
-		Reader: strings.NewReader(`{"method": "Arith.Add", "id": "123", "params": []}`),
+		Reader: strings.NewReader(`{"jsonrpc": "2.0", "method": "Arith.Add", "id": "123", "params": []}`),
 		Writer: &out,
 		Closer: ioutil.NopCloser(nil),
 	})
