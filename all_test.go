@@ -99,7 +99,7 @@ func TestServer(t *testing.T) {
 
 	// Send hand-coded requests to server, parse responses.
 	for i := 0; i < 10; i++ {
-		fmt.Fprintf(cli, `{"jsonrpc": "2.0", "method": "Arith.Add", "id": "\u%04d", "params": [{"A": %d, "B": %d}]}`, i, i, i+1)
+		fmt.Fprintf(cli, `{"jsonrpc": "2.0", "method": "Arith.Add", "id": "\u%04d", "params": {"A": %d, "B": %d}}`, i, i, i+1)
 		var resp ArithAddResp
 		err := dec.Decode(&resp)
 		if err != nil {

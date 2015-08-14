@@ -110,7 +110,7 @@ func (c *serverCodec) ReadRequestHeader(r *rpc.Request) (err error) {
 	}
 	if c.req.Params != nil && len(*c.req.Params) > 0 {
 		switch []byte(*c.req.Params)[0] {
-		case '[': // TODO by-name params
+		case '[', '{':
 		default:
 			return errors.New("bad request")
 		}
@@ -149,13 +149,7 @@ func (c *serverCodec) ReadRequestBody(x interface{}) error {
 	if c.req.Params == nil {
 		return nil
 	}
-	// JSON params is array value.
-	// RPC params is struct.
-	// Unmarshal into array containing struct for now.
-	// Should think about making RPC more general.
-	var params [1]interface{}
-	params[0] = x
-	if err := json.Unmarshal(*c.req.Params, &params); err != nil {
+	if err := json.Unmarshal(*c.req.Params, x); err != nil {
 		return NewError(errParams.Code, err.Error())
 	}
 	return nil

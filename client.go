@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/rpc"
+	"reflect"
 	"sync"
 )
 
@@ -42,20 +43,56 @@ func NewClientCodec(conn io.ReadWriteCloser) rpc.ClientCodec {
 }
 
 type clientRequest struct {
-	Version string         `json:"jsonrpc"`
-	Method  string         `json:"method"`
-	Params  [1]interface{} `json:"params"`
-	Id      uint64         `json:"id"`
+	Version string      `json:"jsonrpc"`
+	Method  string      `json:"method"`
+	Params  interface{} `json:"params,omitempty"`
+	Id      uint64      `json:"id"`
 }
 
 func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
 	// If return error: it will be returned as is for this call.
+	// Allow param to be only Array, Slice, Map or Struct.
+	// When param is nil or uninitialized Map or Slice - omit "params".
+	if param != nil {
+		switch k := reflect.TypeOf(param).Kind(); k {
+		case reflect.Map:
+			if reflect.TypeOf(param).Key().Kind() == reflect.String {
+				if reflect.ValueOf(param).IsNil() {
+					param = nil
+				}
+			}
+		case reflect.Slice:
+			if reflect.ValueOf(param).IsNil() {
+				param = nil
+			}
+		case reflect.Array, reflect.Struct:
+		case reflect.Ptr:
+			switch k := reflect.TypeOf(param).Elem().Kind(); k {
+			case reflect.Map:
+				if reflect.TypeOf(param).Elem().Key().Kind() == reflect.String {
+					if reflect.ValueOf(param).Elem().IsNil() {
+						param = nil
+					}
+				}
+			case reflect.Slice:
+				if reflect.ValueOf(param).Elem().IsNil() {
+					param = nil
+				}
+			case reflect.Array, reflect.Struct:
+			default:
+				return NewError(errInternal.Code, "unsupported param type: Ptr to "+k.String())
+			}
+		default:
+			return NewError(errInternal.Code, "unsupported param type: "+k.String())
+		}
+	}
+
 	c.mutex.Lock()
 	c.pending[r.Seq] = r.ServiceMethod
 	c.mutex.Unlock()
 	c.req.Version = "2.0"
 	c.req.Method = r.ServiceMethod
-	c.req.Params[0] = param
+	c.req.Params = param
 	c.req.Id = r.Seq
 	if err := c.enc.Encode(&c.req); err != nil {
 		return NewError(errInternal.Code, err.Error())
