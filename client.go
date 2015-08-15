@@ -9,11 +9,14 @@ package jsonrpc2
 import (
 	"encoding/json"
 	"io"
+	"math"
 	"net"
 	"net/rpc"
 	"reflect"
 	"sync"
 )
+
+const seqNotify = math.MaxUint64
 
 type clientCodec struct {
 	dec *json.Decoder // for reading JSON values
@@ -46,7 +49,7 @@ type clientRequest struct {
 	Version string      `json:"jsonrpc"`
 	Method  string      `json:"method"`
 	Params  interface{} `json:"params,omitempty"`
-	Id      uint64      `json:"id"`
+	Id      *uint64     `json:"id,omitempty"`
 }
 
 func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
@@ -87,13 +90,17 @@ func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
 		}
 	}
 
-	c.mutex.Lock()
-	c.pending[r.Seq] = r.ServiceMethod
-	c.mutex.Unlock()
+	if r.Seq != seqNotify {
+		c.mutex.Lock()
+		c.pending[r.Seq] = r.ServiceMethod
+		c.mutex.Unlock()
+		c.req.Id = &r.Seq
+	} else {
+		c.req.Id = nil
+	}
 	c.req.Version = "2.0"
 	c.req.Method = r.ServiceMethod
 	c.req.Params = param
-	c.req.Id = r.Seq
 	if err := c.enc.Encode(&c.req); err != nil {
 		return NewError(errInternal.Code, err.Error())
 	}
@@ -213,14 +220,37 @@ func (c *clientCodec) Close() error {
 	return c.c.Close()
 }
 
-// NewClient returns a new rpc.Client to handle requests to the
+// Client represents a JSON RPC 2.0 Client.
+// There may be multiple outstanding Calls associated
+// with a single Client, and a Client may be used by
+// multiple goroutines simultaneously.
+//
+// It also provides all methods of net/rpc.Client.
+type Client struct {
+	*rpc.Client
+	codec *clientCodec
+}
+
+// Notify try to invoke the named function. It return error only in case
+// it wasn't able to send request.
+func (c Client) Notify(serviceMethod string, args interface{}) error {
+	req := &rpc.Request{
+		ServiceMethod: serviceMethod,
+		Seq:           seqNotify,
+	}
+	return c.codec.WriteRequest(req, args)
+}
+
+// NewClient returns a new Client to handle requests to the
 // set of services at the other end of the connection.
-func NewClient(conn io.ReadWriteCloser) *rpc.Client {
-	return rpc.NewClientWithCodec(NewClientCodec(conn))
+func NewClient(conn io.ReadWriteCloser) *Client {
+	codec := NewClientCodec(conn)
+	client := rpc.NewClientWithCodec(codec)
+	return &Client{client, codec.(*clientCodec)}
 }
 
 // Dial connects to a JSON-RPC server at the specified network address.
-func Dial(network, address string) (*rpc.Client, error) {
+func Dial(network, address string) (*Client, error) {
 	conn, err := net.Dial(network, address)
 	if err != nil {
 		return nil, err

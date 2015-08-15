@@ -115,8 +115,8 @@ func (c *serverCodec) ReadRequestHeader(r *rpc.Request) (err error) {
 			return errors.New("bad request")
 		}
 	}
-	if c.req.Id == nil && !okId { // TODO notification
-		return errors.New("bad request")
+	if c.req.Id == nil && okId {
+		c.req.Id = &null
 	}
 	if c.req.Id != nil && len(*c.req.Id) > 0 {
 		switch []byte(*c.req.Id)[0] {
@@ -172,8 +172,8 @@ func (c *serverCodec) WriteResponse(r *rpc.Response, x interface{}) error {
 	c.mutex.Unlock()
 
 	if b == nil {
-		// Invalid request so no id.  Use JSON null.
-		b = &null
+		// Notification. Do not respond.
+		return nil
 	}
 	resp := serverResponse{Version: "2.0", Id: b}
 	if r.Error == "" {
