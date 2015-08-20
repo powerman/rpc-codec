@@ -204,12 +204,16 @@ func (c *clientCodec) ReadResponseHeader(r *rpc.Response) error {
 func (c *clientCodec) ReadResponseBody(x interface{}) error {
 	// If x!=nil and return error e:
 	// - this call get e.Error() appended to "reading body "
-	// - other pending calls get error as is
+	// - other pending calls get error as is XXX actually other calls
+	//   shouldn't be affected by this error at all, so let's at least
+	//   provide different error message for other calls
 	if x == nil {
 		return nil
 	}
 	if err := json.Unmarshal(*c.resp.Result, x); err != nil {
-		return NewError(errInternal.Code, err.Error())
+		e := NewError(errInternal.Code, err.Error())
+		e.Data = NewError(errInternal.Code, "some other Call failed to unmarshal Reply")
+		return e
 	}
 	return nil
 }

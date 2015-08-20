@@ -51,16 +51,29 @@ func ServerError(rpcerr error) *Error {
 		return nil
 	}
 	if err, ok := rpcerr.(*Error); ok {
+		if err.Code == errInternal.Code && err.Data != nil {
+			if err2, ok := err.Data.(*Error); ok {
+				// Use alternate error when ReadResponseBody fail on other call.
+				return err2
+			}
+		}
 		return err
 	}
+	keepData := true
 	errmsg := rpcerr.Error()
 	if s := strings.Index(errmsg, "{"); strings.HasPrefix(errmsg, "reading ") && s != -1 && strings.HasSuffix(errmsg, "}") {
+		// ReadResponseBody fail on this call.
 		errmsg = errmsg[s:]
+		keepData = false
 	}
 	e := &Error{}
 	err := json.Unmarshal([]byte(errmsg), e)
 	if err != nil {
 		panic(fmt.Sprintf("not a jsonrpc2 error: %s (%#q)", err, rpcerr))
+	}
+	if e.Code == errInternal.Code && e.Data != nil && !keepData {
+		// ReadResponseBody fail on this call.
+		e.Data = nil
 	}
 	return e
 }

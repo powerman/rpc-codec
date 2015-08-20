@@ -860,3 +860,34 @@ func TestCallTyped(t *testing.T) {
 		}
 	}
 }
+
+func TestClientMassError_json(t *testing.T) {
+	cli, srv := net.Pipe()
+	go ServeConn(srv)
+	client := NewClient(cli)
+	defer client.Close()
+
+	for i := len(svcMsg); i < cap(svcMsg); i++ {
+		svcMsg <- ""
+	}
+	defer func() {
+		for len(svcMsg) > 0 {
+			<-svcMsg
+		}
+	}()
+
+	wanterr1 := NewError(-32603, "json: cannot unmarshal number into Go value of type string")
+	wanterr2 := NewError(-32603, "some other Call failed to unmarshal Reply")
+
+	call2 := client.Go("Svc.Msg", []string{"test"}, nil, nil)
+	var badreply string
+	err1 := client.Call("Svc.Sum", [2]int{}, &badreply)
+	if err1 == nil || !reflect.DeepEqual(ServerError(err1), wanterr1) {
+		t.Errorf("%serr1 = %v, wanterr1 = %v", caller(), err1, wanterr1)
+	}
+	<-call2.Done
+	err2 := call2.Error
+	if err2 == nil || !reflect.DeepEqual(ServerError(err2), wanterr2) {
+		t.Errorf("%serr2 = %v, wanterr2 = %v", caller(), err2, wanterr2)
+	}
+}
