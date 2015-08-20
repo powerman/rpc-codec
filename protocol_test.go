@@ -539,6 +539,7 @@ func TestClientResponse(t *testing.T) {
 		{`{"jsonrpc":"2.0","id":0,"error":{"code":0,"MESSAGE":"","data":""}}`, 0.0, errBadResponseFmt},
 		{`{"jsonrpc":"2.0","id":0,"error":{"code":0,"message":"","DATA":""}}`, 0.0, errBadResponseFmt},
 		// extra key
+		{`{"jsonrpc":"2.0","id":0,"error":{"code":0,"message":"","data":"","extra":null}}`, 0.0, errBadResponseFmt},
 		{`{"jsonrpc":"2.0","id":0,"error":{"code":0,"message":"","extra":null}}`, 0.0, errBadResponseFmt},
 		{`{"jsonrpc":"2.0","id":0,"error":{"code":0,"message":""},"extra":null}`, 0.0, errBadResponseFmt},
 	}

@@ -168,9 +168,6 @@ func (c *clientCodec) ReadResponseHeader(r *rpc.Response) error {
 		if err := json.Unmarshal(*rawMap["error"], &rawErrMap); err != nil {
 			return NewError(errInternal.Code, "bad response: "+string(raw))
 		}
-		if len(rawErrMap) < 2 || len(rawErrMap) > 4 {
-			return NewError(errInternal.Code, "bad response: "+string(raw))
-		}
 		if rawErrMap["code"] == nil {
 			return NewError(errInternal.Code, "bad response: "+string(raw))
 		}
@@ -178,6 +175,9 @@ func (c *clientCodec) ReadResponseHeader(r *rpc.Response) error {
 			return NewError(errInternal.Code, "bad response: "+string(raw))
 		}
 		if _, ok := rawErrMap["data"]; len(rawErrMap) == 3 && !ok {
+			return NewError(errInternal.Code, "bad response: "+string(raw))
+		}
+		if len(rawErrMap) > 3 {
 			return NewError(errInternal.Code, "bad response: "+string(raw))
 		}
 	}
