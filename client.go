@@ -24,7 +24,6 @@ type clientCodec struct {
 	c   io.Closer
 
 	// temporary work space
-	req  clientRequest
 	resp clientResponse
 
 	// JSON-RPC responses include the request id but not the request method.
@@ -90,18 +89,17 @@ func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
 		}
 	}
 
+	var req clientRequest
 	if r.Seq != seqNotify {
 		c.mutex.Lock()
 		c.pending[r.Seq] = r.ServiceMethod
 		c.mutex.Unlock()
-		c.req.Id = &r.Seq
-	} else {
-		c.req.Id = nil
+		req.Id = &r.Seq
 	}
-	c.req.Version = "2.0"
-	c.req.Method = r.ServiceMethod
-	c.req.Params = param
-	if err := c.enc.Encode(&c.req); err != nil {
+	req.Version = "2.0"
+	req.Method = r.ServiceMethod
+	req.Params = param
+	if err := c.enc.Encode(&req); err != nil {
 		return NewError(errInternal.Code, err.Error())
 	}
 	return nil
