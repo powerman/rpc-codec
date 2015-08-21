@@ -31,7 +31,7 @@ type serverCodec struct {
 	pending map[uint64]*json.RawMessage
 }
 
-// NewServerCodec returns a new rpc.ServerCodec using JSON-RPC on conn.
+// NewServerCodec returns a new rpc.ServerCodec using JSON-RPC 2.0 on conn.
 func NewServerCodec(conn io.ReadWriteCloser) rpc.ServerCodec {
 	return &serverCodec{
 		dec:     json.NewDecoder(conn),
@@ -198,7 +198,7 @@ func (c *serverCodec) Close() error {
 	return c.c.Close()
 }
 
-// ServeConn runs the JSON-RPC server on a single connection.
+// ServeConn runs the JSON-RPC 2.0 server on a single connection.
 // ServeConn blocks, serving the connection until the client hangs up.
 // The caller typically invokes ServeConn in a go statement.
 func ServeConn(conn io.ReadWriteCloser) {

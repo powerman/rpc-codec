@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package jsonrpc2 implements a JSON-RPC 2.0 ClientCodec and ServerCodec
-// for the rpc package.
+// for the net/rpc package.
 package jsonrpc2
 
 import (
@@ -35,7 +35,7 @@ type clientCodec struct {
 	pending map[uint64]string // map request id to method name
 }
 
-// NewClientCodec returns a new rpc.ClientCodec using JSON-RPC on conn.
+// NewClientCodec returns a new rpc.ClientCodec using JSON-RPC 2.0 on conn.
 func NewClientCodec(conn io.ReadWriteCloser) rpc.ClientCodec {
 	return &clientCodec{
 		dec:     json.NewDecoder(conn),
@@ -221,7 +221,7 @@ func (c *clientCodec) Close() error {
 // with a single Client, and a Client may be used by
 // multiple goroutines simultaneously.
 //
-// It also provides all methods of net/rpc.Client.
+// It also provides all methods of net/rpc Client.
 type Client struct {
 	*rpc.Client
 	codec *clientCodec
@@ -245,7 +245,7 @@ func NewClient(conn io.ReadWriteCloser) *Client {
 	return &Client{client, codec.(*clientCodec)}
 }
 
-// Dial connects to a JSON-RPC server at the specified network address.
+// Dial connects to a JSON-RPC 2.0 server at the specified network address.
 func Dial(network, address string) (*Client, error) {
 	conn, err := net.Dial(network, address)
 	if err != nil {

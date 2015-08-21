@@ -17,7 +17,7 @@ var (
 	errServerError = NewError(-32001, "jsonrpc2.Error: json.Marshal failed")
 )
 
-// Error represent JSON RPC 2.0 "Error object".
+// Error represent JSON-RPC 2.0 "Error object".
 type Error struct {
 	Code    int         `json:"code"`
 	Message string      `json:"message"`
@@ -43,7 +43,7 @@ func newError(message string) *Error {
 	}
 }
 
-// ServerError convert errors returned by client.Call() into Error.
+// ServerError convert errors returned by Client.Call() into Error.
 // User should check for rpc.ErrShutdown and io.ErrUnexpectedEOF before
 // calling ServerError.
 func ServerError(rpcerr error) *Error {
