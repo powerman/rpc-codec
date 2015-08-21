@@ -8,6 +8,7 @@ package jsonrpc2
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"math"
 	"net"
@@ -107,16 +108,62 @@ func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
 
 type clientResponse struct {
 	Version string           `json:"jsonrpc"`
-	Id      uint64           `json:"id"`
+	Id      *uint64          `json:"id"`
 	Result  *json.RawMessage `json:"result"`
 	Error   *Error           `json:"error"`
 }
 
 func (r *clientResponse) reset() {
 	r.Version = ""
-	r.Id = 0
+	r.Id = nil
 	r.Result = nil
 	r.Error = nil
+}
+
+func (r *clientResponse) UnmarshalJSON(raw []byte) error {
+	r.reset()
+	type resp *clientResponse
+	if err := json.Unmarshal(raw, resp(r)); err != nil {
+		return errors.New("bad response: " + string(raw))
+	}
+
+	var o = make(map[string]*json.RawMessage)
+	if err := json.Unmarshal(raw, &o); err != nil {
+		return errors.New("bad response: " + string(raw))
+	}
+	_, okVer := o["jsonrpc"]
+	_, okId := o["id"]
+	_, okRes := o["result"]
+	_, okErr := o["error"]
+	if !okVer || !okId || !(okRes || okErr) || (okRes && okErr) || len(o) > 3 {
+		return errors.New("bad response: " + string(raw))
+	}
+	if r.Version != "2.0" {
+		return errors.New("bad response: " + string(raw))
+	}
+	if okRes && r.Result == nil {
+		r.Result = &null
+	}
+	if okErr {
+		if o["error"] == nil {
+			return errors.New("bad response: " + string(raw))
+		}
+		oe := make(map[string]*json.RawMessage)
+		if err := json.Unmarshal(*o["error"], &oe); err != nil {
+			return errors.New("bad response: " + string(raw))
+		}
+		if oe["code"] == nil || oe["message"] == nil {
+			return errors.New("bad response: " + string(raw))
+		}
+		if _, ok := oe["data"]; (!ok && len(oe) > 2) || len(oe) > 3 {
+			return errors.New("bad response: " + string(raw))
+		}
+	}
+	if o["id"] == nil && !okErr {
+		return errors.New("bad response: " + string(raw))
+	}
+
+	return nil
 }
 
 func (c *clientCodec) ReadResponseHeader(r *rpc.Response) error {
@@ -125,76 +172,23 @@ func (c *clientCodec) ReadResponseHeader(r *rpc.Response) error {
 	// - it will be returned as is for all pending calls
 	// - client will be shutdown
 	// So, return io.EOF as is, return *Error for all other errors.
-	var raw json.RawMessage
-	if err := c.dec.Decode(&raw); err != nil {
+	if err := c.dec.Decode(&c.resp); err != nil {
 		if err == io.EOF {
 			return err
 		}
 		return NewError(errInternal.Code, err.Error())
 	}
-
-	var rawMap = make(map[string]*json.RawMessage)
-	if err := json.Unmarshal(raw, &rawMap); err != nil {
-		return NewError(errInternal.Code, "bad response: "+string(raw))
-	}
-	if len(rawMap) != 3 {
-		return NewError(errInternal.Code, "bad response: "+string(raw))
-	}
-	if rawMap["jsonrpc"] == nil {
-		return NewError(errInternal.Code, "bad response: "+string(raw))
-	}
-	if _, ok := rawMap["id"]; !ok {
-		return NewError(errInternal.Code, "bad response: "+string(raw))
-	}
-
-	c.resp.reset()
-	if err := json.Unmarshal(raw, &c.resp); err != nil {
-		return NewError(errInternal.Code, "bad response: "+string(raw))
-	}
-	if c.resp.Version != "2.0" {
-		return NewError(errInternal.Code, "bad response: "+string(raw))
-	}
-	if _, ok := rawMap["result"]; ok && c.resp.Result == nil {
-		c.resp.Result = &null
-	}
-	if c.resp.Result == nil && c.resp.Error == nil || c.resp.Result != nil && c.resp.Error != nil {
-		return NewError(errInternal.Code, "bad response: "+string(raw))
-	}
-	if c.resp.Error != nil {
-		if rawMap["error"] == nil {
-			return NewError(errInternal.Code, "bad response: "+string(raw))
-		}
-		rawErrMap := make(map[string]*json.RawMessage)
-		if err := json.Unmarshal(*rawMap["error"], &rawErrMap); err != nil {
-			return NewError(errInternal.Code, "bad response: "+string(raw))
-		}
-		if rawErrMap["code"] == nil {
-			return NewError(errInternal.Code, "bad response: "+string(raw))
-		}
-		if rawErrMap["message"] == nil {
-			return NewError(errInternal.Code, "bad response: "+string(raw))
-		}
-		if _, ok := rawErrMap["data"]; len(rawErrMap) == 3 && !ok {
-			return NewError(errInternal.Code, "bad response: "+string(raw))
-		}
-		if len(rawErrMap) > 3 {
-			return NewError(errInternal.Code, "bad response: "+string(raw))
-		}
-	}
-	if rawMap["id"] == nil {
-		if c.resp.Error != nil {
-			return c.resp.Error
-		}
-		return NewError(errInternal.Code, "bad response: "+string(raw))
+	if c.resp.Id == nil {
+		return c.resp.Error
 	}
 
 	c.mutex.Lock()
-	r.ServiceMethod = c.pending[c.resp.Id]
-	delete(c.pending, c.resp.Id)
+	r.ServiceMethod = c.pending[*c.resp.Id]
+	delete(c.pending, *c.resp.Id)
 	c.mutex.Unlock()
 
 	r.Error = ""
-	r.Seq = c.resp.Id
+	r.Seq = *c.resp.Id
 	if c.resp.Error != nil {
 		r.Error = c.resp.Error.Error()
 	}

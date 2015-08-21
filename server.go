@@ -55,6 +55,54 @@ func (r *serverRequest) reset() {
 	r.Id = nil
 }
 
+func (r *serverRequest) UnmarshalJSON(raw []byte) error {
+	r.reset()
+	type req *serverRequest
+	if err := json.Unmarshal(raw, req(r)); err != nil {
+		return errors.New("bad request")
+	}
+
+	var o = make(map[string]*json.RawMessage)
+	if err := json.Unmarshal(raw, &o); err != nil { // TODO batch
+		return errors.New("bad request")
+	}
+	if o["jsonrpc"] == nil || o["method"] == nil {
+		return errors.New("bad request")
+	}
+	_, okId := o["id"]
+	_, okParams := o["params"]
+	if len(o) == 3 && !(okId || okParams) || len(o) == 4 && !(okId && okParams) || len(o) > 4 {
+		return errors.New("bad request")
+	}
+	if r.Version != "2.0" {
+		return errors.New("bad request")
+	}
+	if okParams {
+		if r.Params == nil || len(*r.Params) == 0 {
+			return errors.New("bad request")
+		}
+		switch []byte(*r.Params)[0] {
+		case '[', '{':
+		default:
+			return errors.New("bad request")
+		}
+	}
+	if okId && r.Id == nil {
+		r.Id = &null
+	}
+	if okId {
+		if len(*r.Id) == 0 {
+			return errors.New("bad request")
+		}
+		switch []byte(*r.Id)[0] {
+		case 't', 'f', '{', '[':
+			return errors.New("bad request")
+		}
+	}
+
+	return nil
+}
+
 type serverResponse struct {
 	Version string           `json:"jsonrpc"`
 	Id      *json.RawMessage `json:"id"`
@@ -66,63 +114,13 @@ func (c *serverCodec) ReadRequestHeader(r *rpc.Request) (err error) {
 	// If return error:
 	// - codec will be closed
 	// So, try to send error reply to client before returning error.
-	var raw json.RawMessage
-	if err := c.dec.Decode(&raw); err != nil {
+	if err := c.dec.Decode(&c.req); err != nil {
 		if _, ok := err.(*json.SyntaxError); ok {
 			c.enc.Encode(serverResponse{Version: "2.0", Id: &null, Error: errParse})
-		}
-		return err
-	}
-	defer func() {
-		if err != nil {
+		} else if err.Error() == "bad request" {
 			c.enc.Encode(serverResponse{Version: "2.0", Id: &null, Error: errRequest})
 		}
-	}()
-
-	var rawMap = make(map[string]*json.RawMessage)
-	if err := json.Unmarshal(raw, &rawMap); err != nil { // TODO batch
 		return err
-	}
-	if len(rawMap) < 2 || len(rawMap) > 4 {
-		return errors.New("bad request")
-	}
-	if rawMap["jsonrpc"] == nil {
-		return errors.New("bad request")
-	}
-	if rawMap["method"] == nil {
-		return errors.New("bad request")
-	}
-	_, okId := rawMap["id"]
-	_, okParams := rawMap["params"]
-	if len(rawMap) == 3 && (!okId && !okParams) || len(rawMap) == 4 && (!okId || !okParams) {
-		return errors.New("bad request")
-	}
-
-	c.req.reset()
-	if err := json.Unmarshal(raw, &c.req); err != nil {
-		return err
-	}
-	if c.req.Version != "2.0" {
-		return errors.New("bad request")
-	}
-	if c.req.Params == nil && okParams {
-		return errors.New("bad request")
-	}
-	if c.req.Params != nil && len(*c.req.Params) > 0 {
-		switch []byte(*c.req.Params)[0] {
-		case '[', '{':
-		default:
-			return errors.New("bad request")
-		}
-	}
-	if c.req.Id == nil && okId {
-		c.req.Id = &null
-	}
-	if c.req.Id != nil && len(*c.req.Id) > 0 {
-		switch []byte(*c.req.Id)[0] {
-		case 't', 'f', '{', '[':
-			return errors.New("bad request")
-		}
 	}
 
 	r.ServiceMethod = c.req.Method
