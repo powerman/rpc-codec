@@ -217,7 +217,7 @@ func TestServerErrorHasNullResult(t *testing.T) {
 		Reader: strings.NewReader(`{"jsonrpc": "2.0", "method": "Arith.Add", "id": "123", "params": []}`),
 		Writer: &out,
 		Closer: ioutil.NopCloser(nil),
-	})
+	}, nil)
 	r := new(rpc.Request)
 	if err := sc.ReadRequestHeader(r); err != nil {
 		t.Fatal(err)

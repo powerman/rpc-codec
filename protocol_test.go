@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -195,6 +196,27 @@ func testClientNotify(t *testing.T, cli, srv net.Conn, client *Client, method st
 	}
 }
 
+type batchReply []interface{}
+
+func (a batchReply) Len() int      { return len(a) }
+func (a batchReply) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a batchReply) Less(i, j int) bool {
+	var id_i, id_j float64
+	if m, ok := a[i].(map[string]interface{}); ok && m["id"] != nil {
+		id_i, _ = m["id"].(float64)
+	}
+	if m, ok := a[j].(map[string]interface{}); ok && m["id"] != nil {
+		id_j, _ = m["id"].(float64)
+	}
+	return id_i < id_j
+}
+
+func sortBatch(x interface{}) {
+	if a, ok := x.([]interface{}); ok {
+		sort.Sort(batchReply(a))
+	}
+}
+
 // Tests
 
 const (
@@ -223,6 +245,24 @@ func TestServerJSON(t *testing.T) {
 		{`42`, jerrRequest},
 		{`"str"`, jerrRequest},
 		{`[]`, jerrRequest},
+		{`[null]`, `[` + jerrRequest + `]`},
+		{`[true]`, `[` + jerrRequest + `]`},
+		{`[false]`, `[` + jerrRequest + `]`},
+		{`[0]`, `[` + jerrRequest + `]`},
+		{`[""]`, `[` + jerrRequest + `]`},
+		{`[[]]`, `[` + jerrRequest + `]`},
+		{
+			`[{},[],{}]`,
+			`[` + jerrRequest + `,` + jerrRequest + `,` + jerrRequest + `]`,
+		},
+		{
+			`[{"jsonrpc":"2.0","method":""},[{"jsonrpc":"2.0","method":""}],{"jsonrpc":"2.0","method":""}]`,
+			`[` + jerrRequest + `]`,
+		},
+		{
+			`[{"jsonrpc":"2.0","id":null},[{"jsonrpc":"2.0","method":""}],{"jsonrpc":"2.0","id":0}]`,
+			`[` + jerrRequest + `,` + jerrRequest + `,` + jerrRequest + `]`,
+		},
 		// Version
 		{`{}`, jerrRequest},
 		{`{                  "id":0,"method":"Svc.Sum","params":[3,5]}`, jerrRequest},
@@ -396,6 +436,40 @@ func TestServerJSON(t *testing.T) {
 				`{"jsonrpc":"2.0","method":"Svc.Msg","params":["three"]}`,
 			jres15,
 		},
+		// Batch
+		{
+			`[{"jsonrpc":"2.0","id":0,"method":"Svc.Sum","params":[2,3]}]`,
+			`[{"jsonrpc":"2.0","id":0,"result":5}]`,
+		},
+		{
+			`[{"jsonrpc":"2.0","id":1,"method":"Svc.Sum","params":[2,3]},{"jsonrpc":"2.0","method":"Svc.Sum","params":[1,2]}]`,
+			`[{"jsonrpc":"2.0","id":1,"result":5}]`,
+		},
+		{
+			`[{"jsonrpc":"2.0","method":"Svc.Sum","params":[1,2]},{"jsonrpc":"2.0","method":"Svc.Sum","params":[2,3]}]{"jsonrpc":"2.0","id":3,"method":"Svc.Sum","params":[3,4]}`,
+			`{"jsonrpc":"2.0","id":3,"result":7}`,
+		},
+		{
+			`[{"JSONRPC":"2.0","id":0,"method":"Svc.Sum","params":[2,3]}]`,
+			`[` + jerrRequest + `]`,
+		},
+		{
+			`[{"id":0},{"id":1}]`,
+			`[` + jerrRequest + `,` + jerrRequest + `]`,
+		},
+		{
+			`[` +
+				`{"jsonrpc":"2.0","id":3,"method":"Svc.Sum","params":[3,4]},` +
+				`{"jsonrpc":"2.0","id":0,"method":"Svc.Sum","params":[0,1]},` +
+				`{"jsonrpc":"2.0","method":"Svc.Sum","params":[3,4]},` +
+				`{"jsonrpc":"2.0","id":2,"method":"Svc.Err2"},` +
+				`{"jsonrpc":"2.0","id":1,"method":"Svc.Sum","params":[1,2]}]`,
+			`[` +
+				`{"jsonrpc":"2.0","id":0,"result":1},` +
+				`{"jsonrpc":"2.0","id":1,"result":3},` +
+				`{"jsonrpc":"2.0","id":2,"error":{"code":42,"message":"some issue"}},` +
+				`{"jsonrpc":"2.0","id":3,"result":7}]`,
+		},
 	}
 
 	for _, c := range cases {
@@ -427,6 +501,8 @@ func TestServerJSON(t *testing.T) {
 		if err := json.Unmarshal([]byte(c.want), &jwant); err != nil {
 			t.Errorf("expect err = %v\nsent: %#q\nwant: %#q", err, c.in, c.want)
 		}
+		sortBatch(jgot)
+		sortBatch(jwant)
 		if !reflect.DeepEqual(jgot, jwant) {
 			t.Errorf("\nsent: %#q\nwant: %#q\nrecv: %#q", c.in, c.want, got)
 		}
