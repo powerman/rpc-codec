@@ -508,15 +508,15 @@ func TestServerJSON(t *testing.T) {
 		}
 	}
 	// Is Svc.Msg was called:
-	for _, wait := range []string{"one", "two", "three"} {
-		select {
-		case msg := <-svcMsg:
-			if msg != wait {
-				t.Errorf("<-svcMsg = %q, want: %q", msg, wait)
-			}
-		default:
-			t.Error("svcMsg is empty")
-		}
+	want := []string{"one", "two", "three"}
+	var got []string
+	for len(svcMsg) > 0 {
+		got = append(got, <-svcMsg)
+	}
+	sort.Strings(want)
+	sort.Strings(got)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("<-svcMsg\nexp: %#q\ngot: %#q", want, got)
 	}
 }
 
