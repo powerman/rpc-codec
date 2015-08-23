@@ -55,14 +55,14 @@ type serverRequest struct {
 	Version string           `json:"jsonrpc"`
 	Method  string           `json:"method"`
 	Params  *json.RawMessage `json:"params"`
-	Id      *json.RawMessage `json:"id"`
+	ID      *json.RawMessage `json:"id"`
 }
 
 func (r *serverRequest) reset() {
 	r.Version = ""
 	r.Method = ""
 	r.Params = nil
-	r.Id = nil
+	r.ID = nil
 }
 
 func (r *serverRequest) UnmarshalJSON(raw []byte) error {
@@ -79,9 +79,9 @@ func (r *serverRequest) UnmarshalJSON(raw []byte) error {
 	if o["jsonrpc"] == nil || o["method"] == nil {
 		return errors.New("bad request")
 	}
-	_, okId := o["id"]
+	_, okID := o["id"]
 	_, okParams := o["params"]
-	if len(o) == 3 && !(okId || okParams) || len(o) == 4 && !(okId && okParams) || len(o) > 4 {
+	if len(o) == 3 && !(okID || okParams) || len(o) == 4 && !(okID && okParams) || len(o) > 4 {
 		return errors.New("bad request")
 	}
 	if r.Version != "2.0" {
@@ -97,14 +97,14 @@ func (r *serverRequest) UnmarshalJSON(raw []byte) error {
 			return errors.New("bad request")
 		}
 	}
-	if okId && r.Id == nil {
-		r.Id = &null
+	if okID && r.ID == nil {
+		r.ID = &null
 	}
-	if okId {
-		if len(*r.Id) == 0 {
+	if okID {
+		if len(*r.ID) == 0 {
 			return errors.New("bad request")
 		}
-		switch []byte(*r.Id)[0] {
+		switch []byte(*r.ID)[0] {
 		case 't', 'f', '{', '[':
 			return errors.New("bad request")
 		}
@@ -115,7 +115,7 @@ func (r *serverRequest) UnmarshalJSON(raw []byte) error {
 
 type serverResponse struct {
 	Version string           `json:"jsonrpc"`
-	Id      *json.RawMessage `json:"id"`
+	ID      *json.RawMessage `json:"id"`
 	Result  interface{}      `json:"result,omitempty"`
 	Error   interface{}      `json:"error,omitempty"`
 }
@@ -127,7 +127,7 @@ func (c *serverCodec) ReadRequestHeader(r *rpc.Request) (err error) {
 	var raw json.RawMessage
 	if err := c.dec.Decode(&raw); err != nil {
 		if _, ok := err.(*json.SyntaxError); ok {
-			c.enc.Encode(serverResponse{Version: "2.0", Id: &null, Error: errParse})
+			c.enc.Encode(serverResponse{Version: "2.0", ID: &null, Error: errParse})
 		}
 		return err
 	}
@@ -136,10 +136,10 @@ func (c *serverCodec) ReadRequestHeader(r *rpc.Request) (err error) {
 		c.req.Version = "2.0"
 		c.req.Method = "JSONRPC2.Batch"
 		c.req.Params = &raw
-		c.req.Id = &null
+		c.req.ID = &null
 	} else if err := json.Unmarshal(raw, &c.req); err != nil {
 		if err.Error() == "bad request" {
-			c.enc.Encode(serverResponse{Version: "2.0", Id: &null, Error: errRequest})
+			c.enc.Encode(serverResponse{Version: "2.0", ID: &null, Error: errRequest})
 		}
 		return err
 	}
@@ -151,8 +151,8 @@ func (c *serverCodec) ReadRequestHeader(r *rpc.Request) (err error) {
 	// internal uint64 and save JSON on the side.
 	c.mutex.Lock()
 	c.seq++
-	c.pending[c.seq] = c.req.Id
-	c.req.Id = nil
+	c.pending[c.seq] = c.req.ID
+	c.req.ID = nil
 	r.Seq = c.seq
 	c.mutex.Unlock()
 
@@ -210,7 +210,7 @@ func (c *serverCodec) WriteResponse(r *rpc.Response, x interface{}) error {
 		// Notification. Do not respond.
 		return nil
 	}
-	resp := serverResponse{Version: "2.0", Id: b}
+	resp := serverResponse{Version: "2.0", ID: b}
 	if r.Error == "" {
 		if x == nil {
 			resp.Result = &null

@@ -50,7 +50,7 @@ type clientRequest struct {
 	Version string      `json:"jsonrpc"`
 	Method  string      `json:"method"`
 	Params  interface{} `json:"params,omitempty"`
-	Id      *uint64     `json:"id,omitempty"`
+	ID      *uint64     `json:"id,omitempty"`
 }
 
 func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
@@ -96,7 +96,7 @@ func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
 		c.mutex.Lock()
 		c.pending[r.Seq] = r.ServiceMethod
 		c.mutex.Unlock()
-		req.Id = &r.Seq
+		req.ID = &r.Seq
 	}
 	req.Version = "2.0"
 	req.Method = r.ServiceMethod
@@ -109,14 +109,14 @@ func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
 
 type clientResponse struct {
 	Version string           `json:"jsonrpc"`
-	Id      *uint64          `json:"id"`
+	ID      *uint64          `json:"id"`
 	Result  *json.RawMessage `json:"result"`
 	Error   *Error           `json:"error"`
 }
 
 func (r *clientResponse) reset() {
 	r.Version = ""
-	r.Id = nil
+	r.ID = nil
 	r.Result = nil
 	r.Error = nil
 }
@@ -133,10 +133,10 @@ func (r *clientResponse) UnmarshalJSON(raw []byte) error {
 		return errors.New("bad response: " + string(raw))
 	}
 	_, okVer := o["jsonrpc"]
-	_, okId := o["id"]
+	_, okID := o["id"]
 	_, okRes := o["result"]
 	_, okErr := o["error"]
-	if !okVer || !okId || !(okRes || okErr) || (okRes && okErr) || len(o) > 3 {
+	if !okVer || !okID || !(okRes || okErr) || (okRes && okErr) || len(o) > 3 {
 		return errors.New("bad response: " + string(raw))
 	}
 	if r.Version != "2.0" {
@@ -179,17 +179,17 @@ func (c *clientCodec) ReadResponseHeader(r *rpc.Response) error {
 		}
 		return NewError(errInternal.Code, err.Error())
 	}
-	if c.resp.Id == nil {
+	if c.resp.ID == nil {
 		return c.resp.Error
 	}
 
 	c.mutex.Lock()
-	r.ServiceMethod = c.pending[*c.resp.Id]
-	delete(c.pending, *c.resp.Id)
+	r.ServiceMethod = c.pending[*c.resp.ID]
+	delete(c.pending, *c.resp.ID)
 	c.mutex.Unlock()
 
 	r.Error = ""
-	r.Seq = *c.resp.Id
+	r.Seq = *c.resp.ID
 	if c.resp.Error != nil {
 		r.Error = c.resp.Error.Error()
 	}

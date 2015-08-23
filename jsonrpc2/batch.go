@@ -17,6 +17,7 @@ type BatchArg struct {
 	reqs []*json.RawMessage
 }
 
+// Batch is an internal RPC method used to process batch requests.
 func (JSONRPC2) Batch(arg BatchArg, replies *[]*json.RawMessage) (err error) {
 	cli, srv := net.Pipe()
 	defer cli.Close()
@@ -46,7 +47,7 @@ func (JSONRPC2) Batch(arg BatchArg, replies *[]*json.RawMessage) (err error) {
 		if req == nil || json.Unmarshal(*req, &testreq) != nil {
 			replyc <- &jErrRequest
 		} else {
-			if testreq.Id != nil {
+			if testreq.ID != nil {
 				replyc <- nil
 			}
 			if _, err = cli.Write(append(*req, '\n')); err != nil {

@@ -123,7 +123,7 @@ func testClient(t *testing.T, cli, srv net.Conn, client *Client, method string, 
 		cli.Write([]byte("\n"))
 	case res := <-read:
 		if res.err != nil {
-			t.Fatalf("%ssrv.Read(), err =", caller(), res.err)
+			t.Fatalf("%ssrv.Read(), err = %v", caller(), res.err)
 		}
 		got = strings.TrimRight(res.got, "\n")
 	}
@@ -173,7 +173,7 @@ func testClientNotify(t *testing.T, cli, srv net.Conn, client *Client, method st
 		cli.Write([]byte("\n"))
 	case res := <-read:
 		if res.err != nil {
-			t.Fatalf("%ssrv.Read(), err =", caller(), res.err)
+			t.Fatalf("%ssrv.Read(), err = %v", caller(), res.err)
 		}
 		got = strings.TrimRight(res.got, "\n")
 	}
@@ -201,14 +201,14 @@ type batchReply []interface{}
 func (a batchReply) Len() int      { return len(a) }
 func (a batchReply) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a batchReply) Less(i, j int) bool {
-	var id_i, id_j float64
+	var idI, idJ float64
 	if m, ok := a[i].(map[string]interface{}); ok && m["id"] != nil {
-		id_i, _ = m["id"].(float64)
+		idI, _ = m["id"].(float64)
 	}
 	if m, ok := a[j].(map[string]interface{}); ok && m["id"] != nil {
-		id_j, _ = m["id"].(float64)
+		idJ, _ = m["id"].(float64)
 	}
-	return id_i < id_j
+	return idI < idJ
 }
 
 func sortBatch(x interface{}) {
@@ -652,8 +652,8 @@ func TestClientResponse(t *testing.T) {
 // TODO test for rpc.ErrShutdown && io.ErrUnexpectedEOF
 
 func TestClientRequest(t *testing.T) {
-	var var_slice []int
-	var var_map map[string]int
+	var varSlice []int
+	var varMap map[string]int
 	cases := []struct {
 		method  string
 		in      interface{}
@@ -741,7 +741,7 @@ func TestClientRequest(t *testing.T) {
 			`{"jsonrpc":"2.0","method":"","params":{"1":2},"id":0}`, nil,
 		},
 		{
-			"", var_map,
+			"", varMap,
 			`{"jsonrpc":"2.0","method":"","id":0}`, nil,
 		},
 		{
@@ -761,7 +761,7 @@ func TestClientRequest(t *testing.T) {
 			`{"jsonrpc":"2.0","method":"","params":[1,2],"id":0}`, nil,
 		},
 		{
-			"", var_slice,
+			"", varSlice,
 			`{"jsonrpc":"2.0","method":"","id":0}`, nil,
 		},
 		{

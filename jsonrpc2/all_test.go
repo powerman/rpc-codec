@@ -29,7 +29,7 @@ type Reply struct {
 type Arith int
 
 type ArithAddResp struct {
-	Id     interface{} `json:"id"`
+	ID     interface{} `json:"id"`
 	Result Reply       `json:"result"`
 	Error  interface{} `json:"error"`
 }
@@ -109,8 +109,8 @@ func TestServer(t *testing.T) {
 		if resp.Error != nil {
 			t.Fatalf("resp.Error: %s", resp.Error)
 		}
-		if resp.Id.(string) != string(i) {
-			t.Fatalf("resp: bad id %q want %q", resp.Id.(string), string(i))
+		if resp.ID.(string) != string(i) {
+			t.Fatalf("resp: bad id %q want %q", resp.ID.(string), string(i))
 		}
 		if resp.Result.C != 2*i+1 {
 			t.Fatalf("resp: bad result: %d+%d=%d", i, i+1, resp.Result.C)
@@ -243,8 +243,8 @@ func TestServerErrorHasNullResult(t *testing.T) {
 
 func TestUnexpectedError(t *testing.T) {
 	cli, srv := myPipe()
-	go cli.PipeWriter.CloseWithError(errors.New("unexpected error!")) // reader will get this error
-	ServeConn(srv)                                                    // must return, not loop
+	go cli.PipeWriter.CloseWithError(errors.New("unexpected error")) // reader will get this error
+	ServeConn(srv)                                                   // must return, not loop
 }
 
 // Copied from package net.
