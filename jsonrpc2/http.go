@@ -79,6 +79,10 @@ func (conn *httpClientConn) Read(buf []byte) (int, error) {
 	if err == io.EOF {
 		conn.body.Close()
 		conn.body = nil
+		err = nil
+		if n == 0 {
+			return conn.Read(buf)
+		}
 	}
 	return n, err
 }
