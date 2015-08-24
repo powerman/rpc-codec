@@ -7,12 +7,25 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/rpc"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/powerman/rpc-codec/jsonrpc2"
 )
+
+// Svc is an RPC service for testing.
+type Svc struct{}
+
+func (*Svc) Sum(vals [2]int, res *int) error {
+	*res = vals[0] + vals[1]
+	return nil
+}
+
+func init() {
+	_ = rpc.Register(&Svc{})
+}
 
 var addr = getAddr()
 var path = "/"

@@ -1,3 +1,5 @@
+// +build go1.3
+
 package jsonrpc2_test
 
 import (
@@ -9,18 +11,6 @@ import (
 
 	"github.com/powerman/rpc-codec/jsonrpc2"
 )
-
-// Svc is an RPC service for testing.
-type Svc struct{}
-
-func (*Svc) Sum(vals [2]int, res *int) error {
-	*res = vals[0] + vals[1]
-	return nil
-}
-
-func init() {
-	_ = rpc.Register(&Svc{})
-}
 
 type client interface {
 	Call(string, interface{}, interface{}) error
