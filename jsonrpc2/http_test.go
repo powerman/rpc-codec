@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
-	"log"
-	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/rpc"
 	"reflect"
 	"strings"
@@ -25,24 +24,6 @@ func (*Svc) Sum(vals [2]int, res *int) error {
 
 func init() {
 	_ = rpc.Register(&Svc{})
-}
-
-var addr = getAddr()
-var path = "/"
-var url = "http://" + addr + path
-
-func getAddr() string {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer ln.Close()
-	return ln.Addr().String()
-}
-
-func init() {
-	http.Handle(path, jsonrpc2.HTTPHandler(nil))
-	go http.ListenAndServe(addr, nil)
 }
 
 func TestHTTPServer(t *testing.T) {
@@ -70,10 +51,13 @@ func TestHTTPServer(t *testing.T) {
 		{"POST", contentType, contentType, jBad, http.StatusOK, jErr},
 	}
 
+	ts := httptest.NewServer(jsonrpc2.HTTPHandler(nil))
+	defer ts.Close()
+
 	for _, c := range cases {
-		req, err := http.NewRequest(c.method, url, strings.NewReader(c.body))
+		req, err := http.NewRequest(c.method, ts.URL, strings.NewReader(c.body))
 		if err != nil {
-			t.Errorf("NewRequest(%s %s), err = %v", c.method, url, err)
+			t.Errorf("NewRequest(%s %s), err = %v", c.method, ts.URL, err)
 		}
 		if c.contentType != "" {
 			req.Header.Add("Content-Type", c.contentType)
@@ -83,13 +67,13 @@ func TestHTTPServer(t *testing.T) {
 		}
 		resp, err := (&http.Client{}).Do(req)
 		if err != nil {
-			t.Errorf("Do(%s %s), err = %v", c.method, url, err)
+			t.Errorf("Do(%s %s), err = %v", c.method, ts.URL, err)
 		}
 		if resp.StatusCode != c.code {
-			t.Errorf("Do(%s %s), status = %v, want = %v", c.method, url, resp.StatusCode, c.code)
+			t.Errorf("Do(%s %s), status = %v, want = %v", c.method, ts.URL, resp.StatusCode, c.code)
 		}
 		if resp.Header.Get("Content-Type") != contentType {
-			t.Errorf("Do(%s %s), Content-Type = %q, want = %q", c.method, url, resp.Header.Get("Content-Type"), contentType)
+			t.Errorf("Do(%s %s), Content-Type = %q, want = %q", c.method, ts.URL, resp.Header.Get("Content-Type"), contentType)
 		}
 		got, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
@@ -97,18 +81,18 @@ func TestHTTPServer(t *testing.T) {
 		}
 		if c.reply == "" {
 			if len(got) != 0 {
-				t.Errorf("Do(%s %s)\nexp: %#q\ngot: %#q", c.method, url, c.reply, string(bytes.TrimRight(got, "\n")))
+				t.Errorf("Do(%s %s)\nexp: %#q\ngot: %#q", c.method, ts.URL, c.reply, string(bytes.TrimRight(got, "\n")))
 			}
 		} else {
 			var jgot, jwant interface{}
 			if err := json.Unmarshal(got, &jgot); err != nil {
-				t.Errorf("Do(%s %s), output err = %v\ngot: %#q", c.method, url, err, string(bytes.TrimRight(got, "\n")))
+				t.Errorf("Do(%s %s), output err = %v\ngot: %#q", c.method, ts.URL, err, string(bytes.TrimRight(got, "\n")))
 			}
 			if err := json.Unmarshal([]byte(c.reply), &jwant); err != nil {
-				t.Errorf("Do(%s %s), expect err = %v\nexp: %#q", c.method, url, err, c.reply)
+				t.Errorf("Do(%s %s), expect err = %v\nexp: %#q", c.method, ts.URL, err, c.reply)
 			}
 			if !reflect.DeepEqual(jgot, jwant) {
-				t.Errorf("Do(%s %s)\nexp: %#q\ngot: %#q", c.method, url, c.reply, string(bytes.TrimRight(got, "\n")))
+				t.Errorf("Do(%s %s)\nexp: %#q\ngot: %#q", c.method, ts.URL, c.reply, string(bytes.TrimRight(got, "\n")))
 			}
 		}
 	}
