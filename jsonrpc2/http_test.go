@@ -97,3 +97,37 @@ func TestHTTPServer(t *testing.T) {
 		}
 	}
 }
+
+func TestHTTPClient(t *testing.T) {
+	ts := httptest.NewServer(jsonrpc2.HTTPHandler(nil))
+	defer ts.Close()
+	client := jsonrpc2.DialHTTP(ts.URL)
+	defer client.Close()
+
+	var in [2]int
+	var got, want int
+
+	in, want = [2]int{1, 2}, 3
+	err := client.Call("Svc.Sum", in, &got)
+	if err != nil {
+		t.Errorf("Call(%v), err = %v", in, err)
+	}
+	if got != want {
+		t.Errorf("Call(%v) = %v, want = %v", in, got, want)
+	}
+
+	in = [2]int{2, 3}
+	err = client.Notify("Svc.Sum", in)
+	if err != nil {
+		t.Errorf("Notify(%v), err = %v", in, err)
+	}
+
+	in, want = [2]int{3, 4}, 7
+	err = client.Call("Svc.Sum", in, &got)
+	if err != nil {
+		t.Errorf("Call(%v), err = %v", in, err)
+	}
+	if got != want {
+		t.Errorf("Call(%v) = %v, want = %v", in, got, want)
+	}
+}

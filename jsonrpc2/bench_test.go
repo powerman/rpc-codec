@@ -5,6 +5,7 @@ package jsonrpc2_test
 import (
 	"io"
 	"net"
+	"net/http/httptest"
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"testing"
@@ -102,6 +103,25 @@ func BenchmarkGOBRPC_tcp(b *testing.B) {
 	client, err := rpc.Dial("tcp", ln.Addr().String())
 	if err != nil {
 		b.Fatal(err)
+	}
+	defer client.Close()
+	benchmarkRPC(b, client)
+}
+
+func BenchmarkJSONRPC2_http(b *testing.B) {
+	ts := httptest.NewServer(jsonrpc2.HTTPHandler(nil))
+	defer ts.Close()
+	client := jsonrpc2.DialHTTP(ts.URL)
+	defer client.Close()
+	benchmarkRPC(b, client)
+}
+
+func BenchmarkGOBRPC_http(b *testing.B) {
+	ts := httptest.NewServer(rpc.DefaultServer)
+	defer ts.Close()
+	client, err := rpc.DialHTTP("tcp", ts.URL[7:])
+	if err != nil {
+		b.Errorf("rpc.DialHTTP(tcp, %q), err = %v", ts.URL, err)
 	}
 	defer client.Close()
 	benchmarkRPC(b, client)
