@@ -14,4 +14,5 @@ before_install:
   - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
 
 script:
-  - cd jsonrpc2; $HOME/gopath/bin/goveralls -service=travis-ci -v -race
+  - go test -v -race ./...
+  - cd jsonrpc2; $HOME/gopath/bin/goveralls -service=travis-ci
