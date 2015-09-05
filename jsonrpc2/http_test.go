@@ -52,7 +52,8 @@ func TestHTTPServer(t *testing.T) {
 	}
 
 	ts := httptest.NewServer(jsonrpc2.HTTPHandler(nil))
-	defer ts.Close()
+	// Don't close because of https://github.com/golang/go/issues/12262
+	// defer ts.Close()
 
 	for _, c := range cases {
 		req, err := http.NewRequest(c.method, ts.URL, strings.NewReader(c.body))
@@ -100,7 +101,8 @@ func TestHTTPServer(t *testing.T) {
 
 func TestHTTPClient(t *testing.T) {
 	ts := httptest.NewServer(jsonrpc2.HTTPHandler(nil))
-	defer ts.Close()
+	// Don't close because of https://github.com/golang/go/issues/12262
+	// defer ts.Close()
 	client := jsonrpc2.NewHTTPClient(ts.URL)
 	defer client.Close()
 
