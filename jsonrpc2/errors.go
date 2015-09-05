@@ -24,12 +24,12 @@ type Error struct {
 	Data    interface{} `json:"data,omitempty"`
 }
 
-// NewError returns an error with given code and message.
+// NewError returns an Error with given code and message.
 func NewError(code int, message string) *Error {
 	return &Error{Code: code, Message: message}
 }
 
-// newError returns an error with auto-detected code for given message.
+// newError returns an Error with auto-detected code for given message.
 func newError(message string) *Error {
 	switch {
 	case strings.HasPrefix(message, "rpc: service/method request ill-formed"):

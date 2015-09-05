@@ -37,8 +37,8 @@ type httpHandler struct {
 // incoming RPC using srv. If srv is nil then use rpc.DefaultServer.
 //
 // Specification: http://www.simple-is-better.org/json-rpc/transport_http.html
-// Pipelined Requests/Responses not supported.
-// GET Request not supported.
+//   - Pipelined Requests/Responses not supported.
+//   - GET Request not supported.
 func HTTPHandler(srv *rpc.Server) http.Handler {
 	if srv == nil {
 		srv = rpc.DefaultServer
