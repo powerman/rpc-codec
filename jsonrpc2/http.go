@@ -2,8 +2,10 @@ package jsonrpc2
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/rpc"
 )
@@ -88,25 +90,38 @@ func (conn *httpClientConn) Read(buf []byte) (int, error) {
 }
 
 func (conn *httpClientConn) Write(buf []byte) (int, error) {
-	req, err := http.NewRequest("POST", conn.url, bytes.NewReader(buf))
-	if err != nil {
-		return 0, err
-	}
-	req.Header.Add("Content-Type", contentType)
-	req.Header.Add("Accept", contentType)
-	resp, err := (&http.Client{}).Do(req)
-	if err != nil {
-		return 0, err
-	}
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusAccepted {
-		return 0, fmt.Errorf("bad HTTP Status: %s", resp.Status)
-	}
-	if resp.Header.Get("Content-Type") != contentType {
-		return 0, fmt.Errorf("bad HTTP Content-Type: %s", resp.Header.Get("Content-Type"))
-	}
-	if resp.StatusCode == http.StatusOK {
-		conn.ready <- resp.Body
-	}
+	b := make([]byte, len(buf))
+	copy(b, buf)
+	go func() {
+		req, err := http.NewRequest("POST", conn.url, bytes.NewReader(b))
+		if err == nil {
+			req.Header.Add("Content-Type", contentType)
+			req.Header.Add("Accept", contentType)
+			var resp *http.Response
+			resp, err = (&http.Client{}).Do(req)
+			if err != nil {
+			} else if resp.Header.Get("Content-Type") != contentType {
+				err = fmt.Errorf("bad HTTP Content-Type: %s", resp.Header.Get("Content-Type"))
+			} else if resp.StatusCode == http.StatusOK {
+				conn.ready <- resp.Body
+				return
+			} else if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusAccepted {
+				resp.Body.Close() // is it should be read to EOF first?
+				return
+			} else {
+				err = fmt.Errorf("bad HTTP Status: %s", resp.Status)
+			}
+			resp.Body.Close() // is it should be read to EOF first?
+		}
+		var res clientResponse
+		if json.Unmarshal(b, &res) == nil && res.ID == nil {
+			return // ignore error from Notification
+		}
+		res.Error = NewError(errInternal.Code, err.Error())
+		buf := &bytes.Buffer{}
+		json.NewEncoder(buf).Encode(res)
+		conn.ready <- ioutil.NopCloser(buf)
+	}()
 	return len(buf), nil
 }
 
