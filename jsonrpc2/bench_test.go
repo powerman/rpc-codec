@@ -111,7 +111,7 @@ func BenchmarkGOBRPC_tcp(b *testing.B) {
 func BenchmarkJSONRPC2_http(b *testing.B) {
 	ts := httptest.NewServer(jsonrpc2.HTTPHandler(nil))
 	defer ts.Close()
-	client := jsonrpc2.DialHTTP(ts.URL)
+	client := jsonrpc2.NewHTTPClient(ts.URL)
 	defer client.Close()
 	benchmarkRPC(b, client)
 }

@@ -114,7 +114,8 @@ func (conn *httpClientConn) Close() error {
 	return nil
 }
 
-// DialHTTP connects to a JSON-RPC 2.0 server using HTTP at the specified url.
-func DialHTTP(url string) *Client {
+// NewHTTPClient returns a new Client to handle requests to the
+// set of services at the given url.
+func NewHTTPClient(url string) *Client {
 	return NewClient(&httpClientConn{url: url, ready: make(chan io.ReadCloser, 16)})
 }

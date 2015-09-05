@@ -101,7 +101,7 @@ func TestHTTPServer(t *testing.T) {
 func TestHTTPClient(t *testing.T) {
 	ts := httptest.NewServer(jsonrpc2.HTTPHandler(nil))
 	defer ts.Close()
-	client := jsonrpc2.DialHTTP(ts.URL)
+	client := jsonrpc2.NewHTTPClient(ts.URL)
 	defer client.Close()
 
 	var in [2]int
