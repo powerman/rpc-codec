@@ -111,7 +111,9 @@ func (conn *httpClientConn) Write(buf []byte) (int, error) {
 			} else {
 				err = fmt.Errorf("bad HTTP Status: %s", resp.Status)
 			}
-			resp.Body.Close() // is it should be read to EOF first?
+			if resp != nil {
+				resp.Body.Close() // is it should be read to EOF first?
+			}
 		}
 		var res clientResponse
 		if json.Unmarshal(b, &res) == nil && res.ID == nil {
