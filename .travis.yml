@@ -11,8 +11,8 @@ go:
 before_install:
   - go get github.com/axw/gocov/gocov
   - go get github.com/mattn/goveralls
-  - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
+  - go get golang.org/x/tools/cmd/cover
 
 script:
   - go test -v -race ./...
-  - cd jsonrpc2; $HOME/gopath/bin/goveralls -service=travis-ci
+  - test "$TRAVIS_GO_VERSION" = "1.4" && cd jsonrpc2 && goveralls -service=travis-ci || true
