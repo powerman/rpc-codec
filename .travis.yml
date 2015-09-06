@@ -15,4 +15,6 @@ before_install:
 
 script:
   - go test -v -race ./...
-  - test "$TRAVIS_GO_VERSION" = "1.4" && cd jsonrpc2 && goveralls -service=travis-ci || true
+
+after_success:
+  - test "$TRAVIS_GO_VERSION" = "1.4" && cd jsonrpc2 && goveralls -service=travis-ci
