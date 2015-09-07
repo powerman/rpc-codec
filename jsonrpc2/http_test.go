@@ -32,6 +32,7 @@ func TestHTTPServer(t *testing.T) {
 	const jNotify = `{"jsonrpc":"2.0","method":"Svc.Sum","params":[3,5]}`
 	const jRes = `{"jsonrpc":"2.0","id":0,"result":8}`
 	const jErr = `{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"Invalid request"}}`
+	const jParse = `{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"Parse error"}}`
 	const contentType = "application/json"
 
 	cases := []struct {
@@ -49,6 +50,10 @@ func TestHTTPServer(t *testing.T) {
 		{"POST", contentType, contentType, jNotify, http.StatusNoContent, ""},
 		{"POST", contentType, contentType, jSum, http.StatusOK, jRes},
 		{"POST", contentType, contentType, jBad, http.StatusOK, jErr},
+		{"POST", contentType, contentType, "", http.StatusOK, jParse},
+		{"POST", contentType, contentType, " ", http.StatusOK, jParse},
+		{"POST", contentType, contentType, "{", http.StatusOK, jParse},
+		{"POST", contentType, contentType, `{"jsonrpc":"2.0",`, http.StatusOK, jParse},
 	}
 
 	ts := httptest.NewServer(jsonrpc2.HTTPHandler(nil))
