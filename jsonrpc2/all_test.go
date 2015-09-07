@@ -6,6 +6,7 @@
 package jsonrpc2
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"net/rpc"
 	"strings"
 	"testing"
@@ -244,7 +247,45 @@ func TestServerErrorHasNullResult(t *testing.T) {
 func TestUnexpectedError(t *testing.T) {
 	cli, srv := myPipe()
 	go cli.PipeWriter.CloseWithError(errors.New("unexpected error")) // reader will get this error
+	go cli.PipeReader.Close()                                        // writer will get ErrClosedPipe
 	ServeConn(srv)                                                   // must return, not loop
+}
+
+func TestBadHTTP2Server(t *testing.T) {
+	ts := httptest.NewServer(HTTPHandler(nil))
+	// Don't close because of https://github.com/golang/go/issues/12262
+	// defer ts.Close()
+	addr := ts.URL[strings.LastIndex(ts.URL, "/")+1:]
+	for _, c := range []string{"", " ", "{", `{"jsonrpc":"2.0",`} {
+		conn, err := net.Dial("tcp", addr)
+		if err != nil {
+			t.Fatalf("Dial(%s), err = %v", addr, err)
+		}
+		_, err = conn.Write([]byte("POST / HTTP/1.0\r\n" +
+			"Host: localhost\r\n" +
+			"Content-Type: application/json\r\n" +
+			"Accept: application/json\r\n" +
+			"Content-Length: " + fmt.Sprintf("%d", len(c)) + "\r\n" +
+			"\r\n" + c))
+		if err != nil {
+			t.Fatalf("[%#q] Write(), err = %v", c, err)
+		}
+		resp, err := http.ReadResponse(bufio.NewReader(conn), nil)
+		if err != nil {
+			t.Fatalf("[%#q] ReadResponse(), err = %v", c, err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("[%#q] resp.StatusCode = %d, want %d", c, resp.StatusCode, http.StatusOK)
+		}
+		var r clientResponse
+		err = json.NewDecoder(resp.Body).Decode(&r)
+		if err != nil {
+			t.Errorf("[%#q] Decode(), err = %v", c, err)
+		}
+		if r.Error == nil || r.Error.Code != errParse.Code {
+			t.Errorf("[%#q] r = %v, wait errParse", c, r)
+		}
+	}
 }
 
 // Copied from package net.

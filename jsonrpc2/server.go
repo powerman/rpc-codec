@@ -14,10 +14,11 @@ import (
 )
 
 type serverCodec struct {
-	dec *json.Decoder // for reading JSON values
-	enc *json.Encoder // for writing JSON values
-	c   io.Closer
-	srv *rpc.Server
+	encmutex sync.Mutex    // protects enc
+	dec      *json.Decoder // for reading JSON values
+	enc      *json.Encoder // for writing JSON values
+	c        io.Closer
+	srv      *rpc.Server
 
 	// temporary work space
 	req serverRequest
@@ -126,9 +127,9 @@ func (c *serverCodec) ReadRequestHeader(r *rpc.Request) (err error) {
 	// So, try to send error reply to client before returning error.
 	var raw json.RawMessage
 	if err := c.dec.Decode(&raw); err != nil {
-		if _, ok := err.(*json.SyntaxError); ok {
-			c.enc.Encode(serverResponse{Version: "2.0", ID: &null, Error: errParse})
-		}
+		c.encmutex.Lock()
+		c.enc.Encode(serverResponse{Version: "2.0", ID: &null, Error: errParse})
+		c.encmutex.Unlock()
 		return err
 	}
 
@@ -139,7 +140,9 @@ func (c *serverCodec) ReadRequestHeader(r *rpc.Request) (err error) {
 		c.req.ID = &null
 	} else if err := json.Unmarshal(raw, &c.req); err != nil {
 		if err.Error() == "bad request" {
+			c.encmutex.Lock()
 			c.enc.Encode(serverResponse{Version: "2.0", ID: &null, Error: errRequest})
+			c.encmutex.Unlock()
 		}
 		return err
 	}
@@ -203,6 +206,8 @@ func (c *serverCodec) WriteResponse(r *rpc.Response, x interface{}) error {
 		if len(*replies) == 0 {
 			return nil
 		}
+		c.encmutex.Lock()
+		defer c.encmutex.Unlock()
 		return c.enc.Encode(replies)
 	}
 
@@ -228,6 +233,8 @@ func (c *serverCodec) WriteResponse(r *rpc.Response, x interface{}) error {
 		raw := json.RawMessage(newError(r.Error).Error())
 		resp.Error = &raw
 	}
+	c.encmutex.Lock()
+	defer c.encmutex.Unlock()
 	return c.enc.Encode(resp)
 }
 
