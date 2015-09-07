@@ -270,7 +270,11 @@ func TestBadHTTP2Server(t *testing.T) {
 		if err != nil {
 			t.Fatalf("[%#q] Write(), err = %v", c, err)
 		}
-		resp, err := http.ReadResponse(bufio.NewReader(conn), nil)
+		req, err := http.NewRequest("POST", ts.URL, strings.NewReader(c))
+		if err != nil {
+			t.Errorf("[%#q] NewRequest(), err = %v", c, err)
+		}
+		resp, err := http.ReadResponse(bufio.NewReader(conn), req)
 		if err != nil {
 			t.Fatalf("[%#q] ReadResponse(), err = %v", c, err)
 		}
