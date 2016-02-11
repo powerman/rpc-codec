@@ -55,7 +55,7 @@ func (*ExampleSvc) Err2(struct{}, *struct{}) error {
 
 // Method returns error with code 42 and extra error data.
 func (*ExampleSvc) Err3(struct{}, *struct{}) error {
-	return &jsonrpc2.Error{42, "some issue", map[string]int{"one": 1, "two": 2}}
+	return &jsonrpc2.Error{42, "some issue", []string{"one", "two"}}
 }
 
 func Example() {
@@ -139,5 +139,5 @@ func Example() {
 	// SumAll(3,5,-2)=6
 	// MapLen({a:10,b:20,c:30})=3
 	// Err1(): code=-32000 msg="some issue" data=<nil>
-	// Err3(): code=42 msg="some issue" data=map[one:1 two:2]
+	// Err3(): code=42 msg="some issue" data=[one two]
 }
