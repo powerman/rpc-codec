@@ -45,9 +45,11 @@ code, message and extra data.
 
 Limitations
 
-HTTP does not support Pipelined Requests/Responses.
+HTTP client&server does not support Pipelined Requests/Responses.
 
-HTTP does not support GET Request.
+HTTP client&server does not support GET Request.
+
+HTTP client does not support Batch Request.
 
 Because of net/rpc limitations RPC method MUST NOT return standard
 error which begins with '{' and ends with '}'.
