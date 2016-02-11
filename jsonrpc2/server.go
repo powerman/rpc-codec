@@ -38,6 +38,12 @@ type serverCodec struct {
 // which will use srv to execute batch requests.
 //
 // If srv is nil then rpc.DefaultServer will be used.
+//
+// For most use cases NewServerCodec is too low-level and you should use
+// ServeConn instead. You'll need NewServerCodec if you wanna register
+// your own object of type named "JSONRPC2" (same as used internally to
+// process batch requests) or you wanna use custom rpc server object
+// instead of rpc.DefaultServer to process requests on conn.
 func NewServerCodec(conn io.ReadWriteCloser, srv *rpc.Server) rpc.ServerCodec {
 	if srv == nil {
 		srv = rpc.DefaultServer
