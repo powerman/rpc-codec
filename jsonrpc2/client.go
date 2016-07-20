@@ -111,6 +111,7 @@ type clientResponse struct {
 	Result  *json.RawMessage `json:"result"`
 	Error   *Error           `json:"error"`
 }
+type ClientResponse clientResponse
 
 func (r *clientResponse) reset() {
 	r.Version = ""
