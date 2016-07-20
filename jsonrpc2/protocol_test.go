@@ -732,10 +732,11 @@ func TestClientRequest(t *testing.T) {
 			"", new(func()),
 			``, NewError(-32603, "unsupported param type: Ptr to func"),
 		},
-		{
-			"", map[int]int{1: 2},
-			``, NewError(-32603, "json: unsupported type: map[int]int"),
-		},
+		// Looks like Go tip @ 2016-07-20 support map[int]int!
+		// {
+		// 	"", map[int]int{1: 2},
+		// 	``, NewError(-32603, "json: unsupported type: map[int]int"),
+		// },
 		{
 			"", map[string]int{"1": 2},
 			`{"jsonrpc":"2.0","method":"","params":{"1":2},"id":0}`, nil,
@@ -744,10 +745,11 @@ func TestClientRequest(t *testing.T) {
 			"", varMap,
 			`{"jsonrpc":"2.0","method":"","id":0}`, nil,
 		},
-		{
-			"", new(map[int]int),
-			``, NewError(-32603, "json: unsupported type: map[int]int"),
-		},
+		// Looks like Go tip @ 2016-07-20 support map[int]int!
+		// {
+		// 	"", new(map[int]int),
+		// 	``, NewError(-32603, "json: unsupported type: map[int]int"),
+		// },
 		{
 			"", new(map[string]int),
 			`{"jsonrpc":"2.0","method":"","id":0}`, nil,
