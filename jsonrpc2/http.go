@@ -67,8 +67,24 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// Doer is an interface for doing HTTP requests.
+type Doer interface {
+	Do(req *http.Request) (resp *http.Response, err error)
+}
+
+// The DoerFunc type is an adapter to allow the use of ordinary
+// functions as HTTP clients. If f is a function with the appropriate
+// signature, DoerFunc(f) is a client that calls f.
+type DoerFunc func(req *http.Request) (resp *http.Response, err error)
+
+// DoerFunc calls f(req).
+func (f DoerFunc) Do(req *http.Request) (resp *http.Response, err error) {
+	return f(req)
+}
+
 type httpClientConn struct {
 	url   string
+	doer  Doer
 	ready chan io.ReadCloser
 	body  io.ReadCloser
 }
@@ -98,7 +114,7 @@ func (conn *httpClientConn) Write(buf []byte) (int, error) {
 			req.Header.Add("Content-Type", contentType)
 			req.Header.Add("Accept", contentType)
 			var resp *http.Response
-			resp, err = (&http.Client{}).Do(req)
+			resp, err = conn.doer.Do(req)
 			if err != nil {
 			} else if resp.Header.Get("Content-Type") != contentType {
 				err = fmt.Errorf("bad HTTP Content-Type: %s", resp.Header.Get("Content-Type"))
@@ -134,5 +150,23 @@ func (conn *httpClientConn) Close() error {
 // NewHTTPClient returns a new Client to handle requests to the
 // set of services at the given url.
 func NewHTTPClient(url string) *Client {
-	return NewClient(&httpClientConn{url: url, ready: make(chan io.ReadCloser, 16)})
+	return NewCustomHTTPClient(url, nil)
+}
+
+// NewCustomHTTPClient returns a new Client to handle requests to the
+// set of services at the given url using provided doer (&http.Client{} by
+// default).
+//
+// Use doer to customize HTTP authorization/headers/etc. sent with each
+// request (it method Do() will receive already configured POST request
+// with url, all required headers and body set according to specification).
+func NewCustomHTTPClient(url string, doer Doer) *Client {
+	if doer == nil {
+		doer = &http.Client{}
+	}
+	return NewClient(&httpClientConn{
+		url:   url,
+		doer:  doer,
+		ready: make(chan io.ReadCloser, 16),
+	})
 }

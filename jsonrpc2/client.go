@@ -108,8 +108,8 @@ func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
 type clientResponse struct {
 	Version string           `json:"jsonrpc"`
 	ID      *uint64          `json:"id"`
-	Result  *json.RawMessage `json:"result"`
-	Error   *Error           `json:"error"`
+	Result  *json.RawMessage `json:"result,omitempty"`
+	Error   *Error           `json:"error,omitempty"`
 }
 
 func (r *clientResponse) reset() {

@@ -98,6 +98,19 @@ func Example() {
 	clientHTTP := jsonrpc2.NewHTTPClient("http://" + lnHTTP.Addr().String() + "/rpc")
 	defer clientHTTP.Close()
 
+	// Custom client use HTTP transport.
+	clientCustomHTTP := jsonrpc2.NewCustomHTTPClient(
+		"http://"+lnHTTP.Addr().String()+"/rpc",
+		jsonrpc2.DoerFunc(func(req *http.Request) (*http.Response, error) {
+			// Setup custom HTTP client.
+			client := &http.Client{}
+			// Modify request as needed.
+			req.Header.Set("Content-Type", "application/json-rpc")
+			return client.Do(req)
+		}),
+	)
+	defer clientCustomHTTP.Close()
+
 	var reply int
 
 	// Synchronous call using positional params and TCP.
@@ -126,6 +139,14 @@ func Example() {
 		fmt.Printf("Err1(): code=%d msg=%q data=%v\n", rpcerr.Code, rpcerr.Message, rpcerr.Data)
 	}
 
+	err = clientCustomHTTP.Call("ExampleSvc.Err2", nil, nil)
+	if err == rpc.ErrShutdown || err == io.ErrUnexpectedEOF {
+		fmt.Printf("Err2(): %q\n", err)
+	} else if err != nil {
+		rpcerr := jsonrpc2.ServerError(err)
+		fmt.Printf("Err2(): code=%d msg=%q data=%v\n", rpcerr.Code, rpcerr.Message, rpcerr.Data)
+	}
+
 	err = clientHTTP.Call("ExampleSvc.Err3", nil, nil)
 	if err == rpc.ErrShutdown || err == io.ErrUnexpectedEOF {
 		fmt.Printf("Err3(): %q\n", err)
@@ -139,5 +160,6 @@ func Example() {
 	// SumAll(3,5,-2)=6
 	// MapLen({a:10,b:20,c:30})=3
 	// Err1(): code=-32000 msg="some issue" data=<nil>
+	// Err2(): code=-32603 msg="bad HTTP Status: 415 Unsupported Media Type" data=<nil>
 	// Err3(): code=42 msg="some issue" data=[one two]
 }
