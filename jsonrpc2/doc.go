@@ -34,6 +34,17 @@ To call such a method you'll have to use client.Call() with []interface{}
 in args.
 
 
+Using context to provide transport-level details with parameters
+
+If you want to have access to transport-level details (or any other
+request context data) in RPC method then first parameter of that RPC
+method should provide WithContext interface. (If first parameter is a
+struct then you can just embed Ctx into your struct as shown in example.)
+
+This way you can get access to client IP address or details of client HTTP
+request etc. in RPC method.
+
+
 Decoding errors on client
 
 Because of net/rpc limitations client.Call() can't return JSON-RPC 2.0
@@ -53,9 +64,6 @@ HTTP client does not support Batch Request.
 
 Because of net/rpc limitations RPC method MUST NOT return standard
 error which begins with '{' and ends with '}'.
-
-Because of net/rpc limitations there is no way to provide
-transport-level details (like client's IP) to RPC method.
 
 Current implementation does a lot of sanity checks to conform to
 protocol spec. Making most of them optional may improve performance.
