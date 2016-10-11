@@ -51,10 +51,18 @@ type NameArgContext struct {
 	jsonrpc2.Ctx
 }
 
-// Method with named params and context.
+// Method with named params and TCP context.
 func (*ExampleSvc) FullName2(t NameArgContext, res *NameRes) error {
 	host, _, _ := net.SplitHostPort(t.Context().Value(RemoteAddrContextKey).(*net.TCPAddr).String())
 	fmt.Printf("FullName2(): Remote IP is %s\n", host)
+	*res = NameRes{t.Fname + " " + t.Lname}
+	return nil
+}
+
+// Method with named params and HTTP context.
+func (*ExampleSvc) FullName3(t NameArgContext, res *NameRes) error {
+	host, _, _ := net.SplitHostPort(jsonrpc2.HTTPRequestFromContext(t.Context()).RemoteAddr)
+	fmt.Printf("FullName3(): Remote IP is %s\n", host)
 	*res = NameRes{t.Fname + " " + t.Lname}
 	return nil
 }
@@ -150,6 +158,9 @@ func Example() {
 	// Synchronous call using named params and TCP with context.
 	clientTCP.Call("ExampleSvc.FullName2", NameArg{"First", "Last"}, nil)
 
+	// Synchronous call using named params and HTTP with context.
+	clientHTTP.Call("ExampleSvc.FullName3", NameArg{"First", "Last"}, nil)
+
 	// Correct error handling.
 	err = clientTCP.Call("ExampleSvc.Err1", nil, nil)
 	if err == rpc.ErrShutdown || err == io.ErrUnexpectedEOF {
@@ -180,6 +191,7 @@ func Example() {
 	// SumAll(3,5,-2)=6
 	// MapLen({a:10,b:20,c:30})=3
 	// FullName2(): Remote IP is 127.0.0.1
+	// FullName3(): Remote IP is 127.0.0.1
 	// Err1(): code=-32000 msg="some issue" data=<nil>
 	// Err2(): code=-32603 msg="bad HTTP Status: 415 Unsupported Media Type" data=<nil>
 	// Err3(): code=42 msg="some issue" data=[one two]

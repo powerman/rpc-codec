@@ -2,6 +2,7 @@ package jsonrpc2
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +12,17 @@ import (
 )
 
 const contentType = "application/json"
+
+type contextKey int
+
+var httpRequestContextKey contextKey = 0
+
+// HTTPRequestFromContext returns HTTP request related to this RPC (if
+// you use HTTPHander to serve JSON RPC 2.0 over HTTP) or nil otherwise.
+func HTTPRequestFromContext(ctx context.Context) *http.Request {
+	req, _ := ctx.Value(httpRequestContextKey).(*http.Request)
+	return req
+}
 
 type httpServerConn struct {
 	req     io.Reader
@@ -60,8 +72,9 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	ctx := context.WithValue(context.Background(), httpRequestContextKey, req)
 	conn := &httpServerConn{req: req.Body, res: w}
-	h.rpc.ServeRequest(NewServerCodec(conn, h.rpc))
+	h.rpc.ServeRequest(NewServerCodecContext(ctx, conn, h.rpc))
 	if !conn.replied {
 		w.WriteHeader(http.StatusNoContent)
 	}
