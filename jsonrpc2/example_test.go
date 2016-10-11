@@ -1,6 +1,7 @@
 package jsonrpc2_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -43,6 +44,21 @@ func (*ExampleSvc) FullName(t NameArg, res *NameRes) error {
 	return nil
 }
 
+var RemoteAddrContextKey = "RemoteAddr"
+
+type NameArgContext struct {
+	Fname, Lname string
+	jsonrpc2.Ctx
+}
+
+// Method with named params and context.
+func (*ExampleSvc) FullName2(t NameArgContext, res *NameRes) error {
+	host, _, _ := net.SplitHostPort(t.Context().Value(RemoteAddrContextKey).(*net.TCPAddr).String())
+	fmt.Printf("FullName2(): Remote IP is %s\n", host)
+	*res = NameRes{t.Fname + " " + t.Lname}
+	return nil
+}
+
 // Method returns error with code -32000.
 func (*ExampleSvc) Err1(struct{}, *struct{}) error {
 	return errors.New("some issue")
@@ -74,7 +90,8 @@ func Example() {
 			if err != nil {
 				return
 			}
-			go jsonrpc2.ServeConn(conn)
+			ctx := context.WithValue(context.Background(), RemoteAddrContextKey, conn.RemoteAddr())
+			go jsonrpc2.ServeConnContext(ctx, conn)
 		}
 	}()
 
@@ -130,6 +147,9 @@ func Example() {
 	// Notification using named params and HTTP.
 	clientHTTP.Notify("ExampleSvc.FullName", NameArg{"First", "Last"})
 
+	// Synchronous call using named params and TCP with context.
+	clientTCP.Call("ExampleSvc.FullName2", NameArg{"First", "Last"}, nil)
+
 	// Correct error handling.
 	err = clientTCP.Call("ExampleSvc.Err1", nil, nil)
 	if err == rpc.ErrShutdown || err == io.ErrUnexpectedEOF {
@@ -159,6 +179,7 @@ func Example() {
 	// Sum(3,5)=8
 	// SumAll(3,5,-2)=6
 	// MapLen({a:10,b:20,c:30})=3
+	// FullName2(): Remote IP is 127.0.0.1
 	// Err1(): code=-32000 msg="some issue" data=<nil>
 	// Err2(): code=-32603 msg="bad HTTP Status: 415 Unsupported Media Type" data=<nil>
 	// Err3(): code=42 msg="some issue" data=[one two]

@@ -15,13 +15,14 @@ type JSONRPC2 struct{}
 type BatchArg struct {
 	srv  *rpc.Server
 	reqs []*json.RawMessage
+	Ctx
 }
 
 // Batch is an internal RPC method used to process batch requests.
 func (JSONRPC2) Batch(arg BatchArg, replies *[]*json.RawMessage) (err error) {
 	cli, srv := net.Pipe()
 	defer cli.Close()
-	go arg.srv.ServeCodec(NewServerCodec(srv, arg.srv))
+	go arg.srv.ServeCodec(NewServerCodecContext(arg.Context(), srv, arg.srv))
 
 	replyc := make(chan *json.RawMessage, len(arg.reqs))
 	donec := make(chan struct{}, 1)

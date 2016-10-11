@@ -6,6 +6,7 @@
 package jsonrpc2
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -19,6 +20,7 @@ type serverCodec struct {
 	enc      *json.Encoder // for writing JSON values
 	c        io.Closer
 	srv      *rpc.Server
+	ctx      context.Context
 
 	// temporary work space
 	req serverRequest
@@ -54,8 +56,17 @@ func NewServerCodec(conn io.ReadWriteCloser, srv *rpc.Server) rpc.ServerCodec {
 		enc:     json.NewEncoder(conn),
 		c:       conn,
 		srv:     srv,
+		ctx:     context.Background(),
 		pending: make(map[uint64]*json.RawMessage),
 	}
+}
+
+// NewServerCodecContext is NewServerCodec with given context provided
+// within parameters for compatible RPC methods.
+func NewServerCodecContext(ctx context.Context, conn io.ReadWriteCloser, srv *rpc.Server) rpc.ServerCodec {
+	codec := NewServerCodec(conn, srv)
+	codec.(*serverCodec).ctx = ctx
+	return codec
 }
 
 type serverRequest struct {
@@ -189,6 +200,9 @@ func (c *serverCodec) ReadRequestBody(x interface{}) error {
 	} else if err := json.Unmarshal(*c.req.Params, x); err != nil {
 		return NewError(errParams.Code, err.Error())
 	}
+	if x, ok := x.(WithContext); ok {
+		x.SetContext(c.ctx)
+	}
 	return nil
 }
 
@@ -253,4 +267,10 @@ func (c *serverCodec) Close() error {
 // The caller typically invokes ServeConn in a go statement.
 func ServeConn(conn io.ReadWriteCloser) {
 	rpc.ServeCodec(NewServerCodec(conn, nil))
+}
+
+// ServeConnContext is ServeConn with given context provided
+// within parameters for compatible RPC methods.
+func ServeConnContext(ctx context.Context, conn io.ReadWriteCloser) {
+	rpc.ServeCodec(NewServerCodecContext(ctx, conn, nil))
 }
