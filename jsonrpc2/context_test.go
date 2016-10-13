@@ -1,7 +1,9 @@
 package jsonrpc2_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"net"
 	"net/http"
 	"net/rpc"
@@ -183,3 +185,57 @@ func TestContext(t *testing.T) {
 		}
 	}
 }
+
+func TestContextBugNoContextWithoutParams(t *testing.T) {
+	cases := []struct {
+		req  string
+		want interface{}
+	}{
+		{
+			`{"jsonrpc":"2.0","id":0,"method":"CtxSvc.NameCtx"}`,
+			map[string]interface{}{
+				"Name":           " ",
+				"TCPRemoteAddr":  "127.0.0.1",
+				"HTTPRemoteAddr": "",
+			},
+		},
+		{
+			`{"jsonrpc":"2.0","id":0,"method":"CtxSvc.NameCtx","params":{}}`,
+			map[string]interface{}{
+				"Name":           " ",
+				"TCPRemoteAddr":  "127.0.0.1",
+				"HTTPRemoteAddr": "",
+			},
+		},
+		{
+			`{"jsonrpc":"2.0","id":0,"method":"CtxSvc.NameCtx","params":{"Fname":"First","Lname":"Last"}}`,
+			map[string]interface{}{
+				"Name":           "First Last",
+				"TCPRemoteAddr":  "127.0.0.1",
+				"HTTPRemoteAddr": "",
+			},
+		},
+	}
+	for _, v := range cases {
+		buf := bytes.NewBufferString(v.req)
+		rpc.ServeRequest(jsonrpc2.NewServerCodecContext(
+			context.WithValue(context.Background(), remoteAddrContextKey, &net.TCPAddr{IP: net.ParseIP("127.0.0.1")}),
+			&bufReadWriteCloser{buf},
+			nil,
+		))
+		var res map[string]interface{}
+		err := json.Unmarshal(buf.Bytes(), &res)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(v.want, res["result"]) {
+			t.Errorf("%q:\n\n\texp: %#v\n\n\tgot: %#v\n\n", v.req, v.want, res["result"])
+		}
+	}
+}
+
+type bufReadWriteCloser struct {
+	*bytes.Buffer
+}
+
+func (b *bufReadWriteCloser) Close() error { return nil }
