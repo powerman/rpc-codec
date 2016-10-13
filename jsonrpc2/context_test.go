@@ -186,6 +186,47 @@ func TestContext(t *testing.T) {
 	}
 }
 
+func TestContextBatch(t *testing.T) {
+	req := `[
+		{"jsonrpc":"2.0","id":0,"method":"CtxSvc.NameCtx","params":{}},
+		{"jsonrpc":"2.0","id":1,"method":"CtxSvc.NameCtx","params":{"Fname":"First","Lname":"Last"}}
+		]`
+	want := []map[string]interface{}{
+		{
+			"jsonrpc": "2.0",
+			"id":      0.0,
+			"result": map[string]interface{}{
+				"Name":           " ",
+				"TCPRemoteAddr":  "127.0.0.1",
+				"HTTPRemoteAddr": "",
+			},
+		},
+		{
+			"jsonrpc": "2.0",
+			"id":      1.0,
+			"result": map[string]interface{}{
+				"Name":           "First Last",
+				"TCPRemoteAddr":  "127.0.0.1",
+				"HTTPRemoteAddr": "",
+			},
+		},
+	}
+	buf := bytes.NewBufferString(req)
+	rpc.ServeRequest(jsonrpc2.NewServerCodecContext(
+		context.WithValue(context.Background(), remoteAddrContextKey, &net.TCPAddr{IP: net.ParseIP("127.0.0.1")}),
+		&bufReadWriteCloser{buf},
+		nil,
+	))
+	var res []map[string]interface{}
+	err := json.Unmarshal(buf.Bytes(), &res)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(want, res) {
+		t.Errorf("%s:\n\n\texp: %#v\n\n\tgot: %#v\n\n", req, want, res)
+	}
+}
+
 func TestContextBugNoContextWithoutParams(t *testing.T) {
 	cases := []struct {
 		req  string
