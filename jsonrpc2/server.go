@@ -185,6 +185,9 @@ func (c *serverCodec) ReadRequestBody(x interface{}) error {
 	if x == nil {
 		return nil
 	}
+	if x, ok := x.(WithContext); ok {
+		x.SetContext(c.ctx)
+	}
 	if c.req.Params == nil {
 		return nil
 	}
@@ -199,9 +202,6 @@ func (c *serverCodec) ReadRequestBody(x interface{}) error {
 		}
 	} else if err := json.Unmarshal(*c.req.Params, x); err != nil {
 		return NewError(errParams.Code, err.Error())
-	}
-	if x, ok := x.(WithContext); ok {
-		x.SetContext(c.ctx)
 	}
 	return nil
 }
