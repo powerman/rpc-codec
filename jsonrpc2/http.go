@@ -67,7 +67,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	if req.Header.Get("Content-Type") != contentType || req.Header.Get("Accept") != contentType {
+	if !strings.Contains(r.Header.Get("Content-Type"), contentType) || !strings.Contains(r.Header.Get("Accept"), contentType) {
 		w.WriteHeader(http.StatusUnsupportedMediaType)
 		return
 	}
