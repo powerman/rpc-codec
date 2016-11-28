@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/rpc"
+	"strings"
 )
 
 const contentType = "application/json"
@@ -67,7 +68,7 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	if req.Header.Get("Content-Type") != contentType || req.Header.Get("Accept") != contentType {
+	if !strings.Contains(req.Header.Get("Content-Type"), contentType) || !strings.Contains(req.Header.Get("Accept"), contentType) {
 		w.WriteHeader(http.StatusUnsupportedMediaType)
 		return
 	}
