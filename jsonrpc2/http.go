@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime"
 	"net/http"
 	"net/rpc"
 )
@@ -67,7 +68,8 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	if req.Header.Get("Content-Type") != contentType || req.Header.Get("Accept") != contentType {
+	mediaType, _, _ := mime.ParseMediaType(req.Header.Get("Content-Type"))
+	if mediaType != contentType || req.Header.Get("Accept") != contentType {
 		w.WriteHeader(http.StatusUnsupportedMediaType)
 		return
 	}
