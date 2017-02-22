@@ -54,6 +54,7 @@ func TestHTTPServer(t *testing.T) {
 		{"POST", contentType, contentType, " ", http.StatusOK, jParse},
 		{"POST", contentType, contentType, "{", http.StatusOK, jParse},
 		{"POST", contentType, contentType, `{"jsonrpc":"2.0",`, http.StatusOK, jParse},
+		{"POST", contentType + "; charset=utf-8", contentType, jSum, http.StatusOK, jRes},
 	}
 
 	ts := httptest.NewServer(jsonrpc2.HTTPHandler(nil))
