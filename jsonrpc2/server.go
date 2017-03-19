@@ -144,9 +144,11 @@ func (c *serverCodec) ReadRequestHeader(r *rpc.Request) (err error) {
 	// So, try to send error reply to client before returning error.
 	var raw json.RawMessage
 	if err := c.dec.Decode(&raw); err != nil {
-		c.encmutex.Lock()
-		c.enc.Encode(serverResponse{Version: "2.0", ID: &null, Error: errParse})
-		c.encmutex.Unlock()
+		if err != io.EOF {
+			c.encmutex.Lock()
+			c.enc.Encode(serverResponse{Version: "2.0", ID: &null, Error: errParse})
+			c.encmutex.Unlock()
+		}
 		return err
 	}
 
