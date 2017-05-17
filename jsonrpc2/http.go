@@ -131,8 +131,11 @@ func (conn *httpClientConn) Write(buf []byte) (int, error) {
 			var resp *http.Response
 			resp, err = conn.doer.Do(req)
 			const maxBodySlurpSize = 32 * 1024
+
+			mediaType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+
 			if err != nil {
-			} else if resp.Header.Get("Content-Type") != contentType {
+			} else if mediaType != contentType {
 				err = fmt.Errorf("bad HTTP Content-Type: %s", resp.Header.Get("Content-Type"))
 			} else if resp.StatusCode == http.StatusOK {
 				conn.ready <- resp.Body
