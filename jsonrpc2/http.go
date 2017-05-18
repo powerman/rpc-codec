@@ -131,7 +131,7 @@ func (conn *httpClientConn) Write(buf []byte) (int, error) {
 			var resp *http.Response
 			resp, err = conn.doer.Do(req)
 			const maxBodySlurpSize = 32 * 1024
-			
+
 			if err == nil {
 				mediaType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 				if mediaType != contentType {
@@ -150,7 +150,7 @@ func (conn *httpClientConn) Write(buf []byte) (int, error) {
 				} else {
 					err = fmt.Errorf("bad HTTP Status: %s", resp.Status)
 				}
-			}	
+			}
 			if resp != nil {
 				// Read the body if small so underlying TCP connection will be re-used.
 				// No need to check for errors: if it fails, Transport won't reuse it anyway.
