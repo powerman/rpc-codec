@@ -31,8 +31,8 @@ func TestHTTPServer(t *testing.T) {
 	const jSum = `{"jsonrpc":"2.0","id":0,"method":"Svc.Sum","params":[3,5]}`
 	const jNotify = `{"jsonrpc":"2.0","method":"Svc.Sum","params":[3,5]}`
 	const jRes = `{"jsonrpc":"2.0","id":0,"result":8}`
-	const jErr = `{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"Invalid request"}}`
-	const jParse = `{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"Parse error"}}`
+	const jErr = `{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"invalid request"}}`
+	const jParse = `{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"parse error"}}`
 	const contentType = "application/json"
 
 	cases := []struct {
