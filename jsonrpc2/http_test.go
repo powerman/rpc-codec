@@ -3,6 +3,8 @@ package jsonrpc2_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -137,5 +139,37 @@ func TestHTTPClient(t *testing.T) {
 	}
 	if got != want {
 		t.Errorf("Call(%v) = %v, want = %v", in, got, want)
+	}
+}
+
+type ContentTypeHanlder string
+
+func (h ContentTypeHanlder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", string(h))
+	io.WriteString(w, `{"jsonrpc":"2.0","id":0,"result":8}`)
+}
+
+func TestHTTPClientContentType(t *testing.T) {
+	const contentType = "application/json"
+	cases := []struct {
+		contentType string
+		errorString string
+	}{
+		{contentType, "<nil>"},
+		{contentType + "; charset=utf-8", "<nil>"},
+		{contentType + "fail", `{"code":-32603,"message":"bad HTTP Content-Type: application/jsonfail"}`},
+	}
+
+	for _, c := range cases {
+		ts := httptest.NewServer(ContentTypeHanlder(c.contentType))
+
+		client := jsonrpc2.NewHTTPClient(ts.URL)
+		in := []string{"ads"}
+		var got int
+		err := client.Call("Svc.Sum", in, &got)
+		actualErrString := fmt.Sprintf("%v", err)
+		if actualErrString != c.errorString {
+			t.Errorf("Unexpected result. exp: %#q\ngot: %#q", actualErrString, c.errorString)
+		}
 	}
 }
