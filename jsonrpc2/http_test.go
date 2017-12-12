@@ -142,9 +142,9 @@ func TestHTTPClient(t *testing.T) {
 	}
 }
 
-type ContentTypeHanlder string
+type ContentTypeHandler string
 
-func (h ContentTypeHanlder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h ContentTypeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", string(h))
 	io.WriteString(w, `{"jsonrpc":"2.0","id":0,"result":8}`)
 }
@@ -161,7 +161,7 @@ func TestHTTPClientContentType(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		ts := httptest.NewServer(ContentTypeHanlder(c.contentType))
+		ts := httptest.NewServer(ContentTypeHandler(c.contentType))
 
 		client := jsonrpc2.NewHTTPClient(ts.URL)
 		in := []string{"ads"}
