@@ -153,24 +153,23 @@ func TestHTTPClientContentType(t *testing.T) {
 	const contentType = "application/json"
 	cases := []struct {
 		contentType string
-		errorString string
+		wanterr     *jsonrpc2.Error
 	}{
-		{contentType, "<nil>"},
-		{contentType + "; charset=utf-8", "<nil>"},
-		{contentType + "; bad", `{"code":-32603,"message":"bad HTTP Content-Type: application/json; bad"}`},
-		{contentType + "fail", `{"code":-32603,"message":"bad HTTP Content-Type: application/jsonfail"}`},
+		{contentType, nil},
+		{contentType + "; charset=utf-8", nil},
+		{contentType + "; bad", jsonrpc2.NewError(-32603, "bad HTTP Content-Type: "+contentType+"; bad")},
+		{contentType + "rpc", jsonrpc2.NewError(-32603, "bad HTTP Content-Type: "+contentType+"rpc")},
 	}
 
-	for _, c := range cases {
-		ts := httptest.NewServer(ContentTypeHandler(c.contentType))
-
+	for _, v := range cases {
+		ts := httptest.NewServer(ContentTypeHandler(v.contentType))
 		client := jsonrpc2.NewHTTPClient(ts.URL)
-		in := []string{"ads"}
-		var got int
-		err := client.Call("Svc.Sum", in, &got)
-		actualErrString := fmt.Sprintf("%v", err)
-		if actualErrString != c.errorString {
-			t.Errorf("Unexpected result. exp: %#q\ngot: %#q", actualErrString, c.errorString)
+
+		err := jsonrpc2.ServerError(client.Call("Svc.Sum", [2]int{3, 4}, nil))
+		if fmt.Sprintf("%#v", err) != fmt.Sprintf("%#v", v.wanterr) {
+			t.Errorf("%q, err = %#v, want %#v", v.contentType, err, v.wanterr)
 		}
+
+		client.Close()
 	}
 }
