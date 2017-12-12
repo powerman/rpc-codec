@@ -157,6 +157,7 @@ func TestHTTPClientContentType(t *testing.T) {
 	}{
 		{contentType, "<nil>"},
 		{contentType + "; charset=utf-8", "<nil>"},
+		{contentType + "; bad", `{"code":-32603,"message":"bad HTTP Content-Type: application/json; bad"}`},
 		{contentType + "fail", `{"code":-32603,"message":"bad HTTP Content-Type: application/jsonfail"}`},
 	}
 
