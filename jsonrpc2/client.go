@@ -223,7 +223,7 @@ func (c *clientCodec) Close() error {
 // It also provides all methods of net/rpc Client.
 type Client struct {
 	*rpc.Client
-	codec *clientCodec
+	codec rpc.ClientCodec
 }
 
 // Notify try to invoke the named function. It return error only in case
@@ -241,7 +241,13 @@ func (c Client) Notify(serviceMethod string, args interface{}) error {
 func NewClient(conn io.ReadWriteCloser) *Client {
 	codec := NewClientCodec(conn)
 	client := rpc.NewClientWithCodec(codec)
-	return &Client{client, codec.(*clientCodec)}
+	return &Client{client, codec}
+}
+
+// NewClientWithCodec returns a new Client using the given rpc.ClientCodec.
+func NewClientWithCodec(codec rpc.ClientCodec) *Client {
+	client := rpc.NewClientWithCodec(codec)
+	return &Client{client, codec}
 }
 
 // Dial connects to a JSON-RPC 2.0 server at the specified network address.
