@@ -239,9 +239,7 @@ func (c Client) Notify(serviceMethod string, args interface{}) error {
 // NewClient returns a new Client to handle requests to the
 // set of services at the other end of the connection.
 func NewClient(conn io.ReadWriteCloser) *Client {
-	codec := NewClientCodec(conn)
-	client := rpc.NewClientWithCodec(codec)
-	return &Client{client, codec}
+	return NewClientWithCodec(NewClientCodec(conn))
 }
 
 // NewClientWithCodec returns a new Client using the given rpc.ClientCodec.
