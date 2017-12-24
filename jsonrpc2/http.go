@@ -16,7 +16,7 @@ const contentType = "application/json"
 
 type contextKey int
 
-var httpRequestContextKey contextKey = 0
+var httpRequestContextKey contextKey
 
 // HTTPRequestFromContext returns HTTP request related to this RPC (if
 // you use HTTPHander to serve JSON RPC 2.0 over HTTP) or nil otherwise.
@@ -68,8 +68,14 @@ func (h *httpHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
+
 	mediaType, _, _ := mime.ParseMediaType(req.Header.Get("Content-Type"))
-	if mediaType != contentType || req.Header.Get("Accept") != contentType {
+	if mediaType != "application/json-rpc" && mediaType != "application/json" && mediaType != "application/jsonrequest" {
+		w.WriteHeader(http.StatusUnsupportedMediaType)
+		return
+	}
+	acceptType, _, _ := mime.ParseMediaType(req.Header.Get("Accept"))
+	if acceptType != "application/json-rpc" && acceptType != "application/json" && acceptType != "application/jsonrequest" {
 		w.WriteHeader(http.StatusUnsupportedMediaType)
 		return
 	}
@@ -147,9 +153,8 @@ func (conn *httpClientConn) Write(buf []byte) (int, error) {
 					}
 					resp.Body.Close()
 					return
-				} else {
-					err = fmt.Errorf("bad HTTP Status: %s", resp.Status)
 				}
+				err = fmt.Errorf("bad HTTP Status: %s", resp.Status)
 			}
 			if resp != nil {
 				// Read the body if small so underlying TCP connection will be re-used.
