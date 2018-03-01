@@ -102,11 +102,16 @@ type httpClientConn struct {
 	doer  Doer
 	ready chan io.ReadCloser
 	body  io.ReadCloser
+	close chan struct{}
 }
 
 func (conn *httpClientConn) Read(buf []byte) (int, error) {
 	if conn.body == nil {
-		conn.body = <-conn.ready
+		select {
+		case <-conn.close:
+			return 0, io.EOF
+		case conn.body = <-conn.ready:
+		}
 	}
 	n, err := conn.body.Read(buf)
 	if err == io.EOF {
@@ -173,6 +178,7 @@ func (conn *httpClientConn) Write(buf []byte) (int, error) {
 }
 
 func (conn *httpClientConn) Close() error {
+	close(conn.close)
 	return nil
 }
 
@@ -197,5 +203,6 @@ func NewCustomHTTPClient(url string, doer Doer) *Client {
 		url:   url,
 		doer:  doer,
 		ready: make(chan io.ReadCloser, 16),
+		close: make(chan struct{}),
 	})
 }
