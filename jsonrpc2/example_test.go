@@ -1,3 +1,4 @@
+// nolint:errcheck
 package jsonrpc2_test
 
 import (
@@ -44,7 +45,9 @@ func (*ExampleSvc) FullName(t NameArg, res *NameRes) error {
 	return nil
 }
 
-var RemoteAddrContextKey = "RemoteAddr"
+type exampleContextKey string
+
+var RemoteAddrContextKey exampleContextKey = "RemoteAddr"
 
 type NameArgContext struct {
 	Fname, Lname string
@@ -139,11 +142,11 @@ func Example() {
 	var reply int
 
 	// Synchronous call using positional params and TCP.
-	err = clientTCP.Call("ExampleSvc.Sum", [2]int{3, 5}, &reply)
+	err = clientTCP.Call("ExampleSvc.Sum", [2]int{3, 5}, &reply) // nolint:ineffassign
 	fmt.Printf("Sum(3,5)=%d\n", reply)
 
 	// Synchronous call using positional params and HTTP.
-	err = clientHTTP.Call("ExampleSvc.SumAll", []int{3, 5, -2}, &reply)
+	err = clientHTTP.Call("ExampleSvc.SumAll", []int{3, 5, -2}, &reply) // nolint:ineffassign
 	fmt.Printf("SumAll(3,5,-2)=%d\n", reply)
 
 	// Asynchronous call using named params and TCP.

@@ -1,3 +1,4 @@
+// nolint:errcheck
 package jsonrpc2
 
 import (
@@ -75,7 +76,7 @@ func caller() string {
 		if !ok {
 			break
 		}
-		if strings.Index(runtime.FuncForPC(pc).Name(), ".Test") != -1 {
+		if strings.Contains(runtime.FuncForPC(pc).Name(), ".Test") {
 			return fmt.Sprintf("\r\t%*s\r\t%s: ", len(callerPos(1)), "", callerPos(skip))
 		}
 	}

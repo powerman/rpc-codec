@@ -1,3 +1,4 @@
+// nolint:errcheck
 package jsonrpc2_test
 
 import (
@@ -16,7 +17,7 @@ import (
 
 type contextKey int
 
-var remoteAddrContextKey contextKey = 0
+var remoteAddrContextKey contextKey
 
 // CtxSvc is an RPC service for testing.
 type CtxSvc struct{}

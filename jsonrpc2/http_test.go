@@ -1,3 +1,4 @@
+// nolint:errcheck
 package jsonrpc2_test
 
 import (

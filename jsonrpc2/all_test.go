@@ -3,6 +3,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// nolint:errcheck
 package jsonrpc2
 
 import (
@@ -57,7 +58,7 @@ func (t *Arith) Error(args *Args, reply *Reply) error {
 }
 
 func init() {
-	rpc.Register(new(Arith))
+	_ = rpc.Register(new(Arith))
 }
 
 func TestServerNoParams(t *testing.T) {
