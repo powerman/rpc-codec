@@ -1,4 +1,4 @@
-# JSON-RPC 2.0 [![GoDoc](https://godoc.org/github.com/powerman/rpc-codec/jsonrpc2?status.svg)](http://godoc.org/github.com/powerman/rpc-codec/jsonrpc2) [![CircleCI](https://circleci.com/gh/powerman/rpc-codec.svg?style=svg)](https://circleci.com/gh/powerman/rpc-codec) [![Coverage Status](https://coveralls.io/repos/powerman/rpc-codec/badge.svg?branch=master&service=github)](https://coveralls.io/github/powerman/rpc-codec?branch=master)
+# JSON-RPC 2.0 [![GoDoc](https://godoc.org/github.com/powerman/rpc-codec/jsonrpc2?status.svg)](http://godoc.org/github.com/powerman/rpc-codec/jsonrpc2) [![CircleCI](https://circleci.com/gh/powerman/rpc-codec.svg?style=svg)](https://circleci.com/gh/powerman/rpc-codec) [![Coverage Status](https://coveralls.io/repos/powerman/rpc-codec/badge.svg?branch=master&service=github)](https://coveralls.io/github/powerman/rpc-codec?branch=master) [![Go Report Card](https://goreportcard.com/badge/github.com/powerman/rpc-codec)](https://goreportcard.com/report/github.com/powerman/rpc-codec)
 
 jsonrpc2 is a codec for net/rpc.
 
