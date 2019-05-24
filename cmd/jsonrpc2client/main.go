@@ -49,14 +49,16 @@ func main() {
 	}
 	flag.Parse()
 
-	if len(flag.Args()) != 2 {
-		FatalUsage("")
-	}
 	method, paramsJSON := flag.Arg(0), flag.Arg(1)
 	var params interface{}
 	err := json.Unmarshal([]byte(paramsJSON), &params)
 
 	switch {
+	case cfg.version:
+		fmt.Println(cmd, ver, runtime.Version())
+		os.Exit(0)
+	case len(flag.Args()) != 2:
+		FatalUsage("")
 	case method == "":
 		FatalUsage("method: required\n")
 	case err != nil:
@@ -67,9 +69,6 @@ func main() {
 		FatalFlagValue("must be endpoint", "http.endpoint", cfg.httpEndpoint)
 	case cfg.transport == transportTCP && cfg.tcpAddr == "":
 		FatalFlagValue("required", "tcp.addr", cfg.tcpAddr)
-	case cfg.version: // Must be checked after all other flags for ease testing.
-		fmt.Println(cmd, ver, runtime.Version())
-		os.Exit(0)
 	}
 
 	var client *jsonrpc2.Client
