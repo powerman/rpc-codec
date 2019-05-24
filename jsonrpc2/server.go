@@ -211,7 +211,7 @@ func (c *serverCodec) ReadRequestBody(x interface{}) error {
 	return nil
 }
 
-var null = json.RawMessage([]byte("null"))
+var null = json.RawMessage([]byte("null")) //nolint:gochecknoglobals
 
 func (c *serverCodec) WriteResponse(r *rpc.Response, x interface{}) error {
 	// If return error: nothing happens.

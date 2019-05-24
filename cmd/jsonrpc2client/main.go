@@ -25,7 +25,7 @@ const (
 //nolint:gochecknoglobals
 var (
 	cmd = strings.TrimSuffix(path.Base(os.Args[0]), ".test")
-	ver = "0.1.0"
+	ver string // set by ./release
 	cfg struct {
 		version      bool
 		notification bool
@@ -86,7 +86,6 @@ func main() {
 	default:
 		panic("never here")
 	}
-	defer client.Close()
 
 	var result interface{}
 	if cfg.notification {

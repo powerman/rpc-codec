@@ -1,0 +1,31 @@
+#!/bin/bash
+set -x -e -o pipefail
+
+DIST_DIR=dist
+TAG=$(git describe --match='v*' --exact-match)
+GH="$(git remote get-url origin | sed -e 's/.*://' -e 's/\.git$//')"
+GH_USER="${GH%%/*}"
+GH_REPO="${GH##*/}"
+
+mkdir -p $DIST_DIR
+while read suffix GOOS GOARCH GOARM; do
+	for pkg in ./cmd/*/; do
+		CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH GOARM=$GOARM \
+		go build -mod=readonly -v -o "$DIST_DIR/$(basename $pkg)-$suffix" \
+			-ldflags "-X 'main.ver=$TAG'" $pkg
+	done
+done <<DIST
+linux-x86_64            linux   amd64
+linux-386               linux   386
+linux-armel             linux   arm     5
+linux-armhf             linux   arm     6
+linux-arm64             linux   arm64
+darwin-x86_64           darwin  amd64
+darwin-386              darwin  386
+freebsd-x86_64          freebsd amd64
+freebsd-386             freebsd 386
+windows-x86_64.exe      windows amd64
+windows-386.exe         windows 386
+DIST
+
+ghr -u "$GH_USER" -r "$GH_REPO" -replace "$TAG" "$DIST_DIR"

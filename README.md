@@ -19,12 +19,21 @@ Also provides command-line tool `jsonrcp2client`.
 go get github.com/powerman/rpc-codec/...
 ```
 
+Or, if you need only `jsonrpc2client` tool, then download binary for your
+OS manually from
+[releases](https://github.com/powerman/rpc-codec/releases) or run this to
+install the latest version:
+
+```sh
+curl -sfL $(curl -s https://api.github.com/repos/powerman/rpc-codec/releases/latest | grep -i /jsonrpc2client-$(uname -s)-$(uname -m)\" | cut -d\" -f4) | sudo install /dev/stdin /usr/local/bin/jsonrpc2client
+```
+
 ## Usage
 
 ### jsonrcp2client
 
 ```
-$ jsonrcp2client
+$ jsonrcp2client -h
 Usage: jsonrpc2client [flags] method params-as-json
   -http.endpoint string
         service endpoint as url

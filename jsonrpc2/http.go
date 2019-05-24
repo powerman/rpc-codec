@@ -16,7 +16,7 @@ const contentType = "application/json"
 
 type contextKey int
 
-var httpRequestContextKey contextKey
+var httpRequestContextKey contextKey //nolint:gochecknoglobals
 
 // HTTPRequestFromContext returns HTTP request related to this RPC (if
 // you use HTTPHander to serve JSON RPC 2.0 over HTTP) or nil otherwise.
@@ -92,7 +92,7 @@ type Doer interface {
 // signature, DoerFunc(f) is a client that calls f.
 type DoerFunc func(req *http.Request) (resp *http.Response, err error)
 
-// DoerFunc calls f(req).
+// Do calls f(req).
 func (f DoerFunc) Do(req *http.Request) (resp *http.Response, err error) {
 	return f(req)
 }
@@ -115,7 +115,7 @@ func (conn *httpClientConn) Read(buf []byte) (int, error) {
 	}
 	n, err := conn.body.Read(buf)
 	if err == io.EOF {
-		conn.body.Close()
+		logIfFail(conn.body.Close)
 		conn.body = nil
 		err = nil
 		if n == 0 {
@@ -151,7 +151,7 @@ func (conn *httpClientConn) Write(buf []byte) (int, error) {
 					if resp.ContentLength == -1 || resp.ContentLength <= maxBodySlurpSize {
 						_, _ = io.CopyN(ioutil.Discard, resp.Body, maxBodySlurpSize)
 					}
-					resp.Body.Close()
+					logIfFail(resp.Body.Close)
 					return
 				default:
 					err = fmt.Errorf("bad HTTP Status: %s", resp.Status)
@@ -163,7 +163,7 @@ func (conn *httpClientConn) Write(buf []byte) (int, error) {
 				if resp.ContentLength == -1 || resp.ContentLength <= maxBodySlurpSize {
 					_, _ = io.CopyN(ioutil.Discard, resp.Body, maxBodySlurpSize)
 				}
-				resp.Body.Close()
+				logIfFail(resp.Body.Close)
 			}
 		}
 		var res clientResponse

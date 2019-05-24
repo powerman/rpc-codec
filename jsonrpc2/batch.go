@@ -6,7 +6,7 @@ import (
 	"net/rpc"
 )
 
-var jErrRequest = json.RawMessage(`{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"invalid request"}}`)
+var jErrRequest = json.RawMessage(`{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"invalid request"}}`) //nolint:gochecknoglobals
 
 // JSONRPC2 is an internal RPC service used to process batch requests.
 type JSONRPC2 struct{}
@@ -21,7 +21,7 @@ type BatchArg struct {
 // Batch is an internal RPC method used to process batch requests.
 func (JSONRPC2) Batch(arg BatchArg, replies *[]*json.RawMessage) (err error) {
 	cli, srv := net.Pipe()
-	defer cli.Close()
+	defer logIfFail(cli.Close)
 	go arg.srv.ServeCodec(NewServerCodecContext(arg.Context(), srv, arg.srv))
 
 	replyc := make(chan *json.RawMessage, len(arg.reqs))

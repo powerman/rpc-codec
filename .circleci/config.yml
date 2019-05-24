@@ -1,11 +1,11 @@
 version: 2.1
 
 jobs:
-    build:
+    test:
         docker:
             - image: circleci/golang:1
         environment:
-            GOLANGCI_LINT_VER: 1.12.2
+            GOLANGCI_LINT_VER: 1.15.0
         steps:
             - checkout
             - run:
@@ -37,3 +37,32 @@ jobs:
                     - /go/pkg/
                     - /go/src/
                     - ~/.cache/go-build/
+    release:
+        docker:
+            - image: circleci/golang:1
+        environment:
+            GHR_VER: 0.12.0
+        steps:
+            - checkout
+            - run:
+                name: Install tools
+                command: |
+                    curl -sfL https://github.com/tcnksm/ghr/releases/download/v${GHR_VER}/ghr_v${GHR_VER}_linux_amd64.tar.gz |
+                        tar xzf - -C /tmp && mv /tmp/ghr_v${GHR_VER}_linux_amd64/ghr /go/bin/
+            - run: ./release
+
+workflows:
+    test-and-release:
+        jobs:
+            - test:
+                filters:
+                    tags:
+                        only: /v.*/
+            - release:
+                requires:
+                    - test
+                filters:
+                    tags:
+                        only: /v.*/
+                    branches:
+                        ignore: /.*/
