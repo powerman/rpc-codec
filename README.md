@@ -10,9 +10,32 @@ specifications with following limitations:
 - HTTP Client&Server: Pipelined Requests/Responses not supported.
 - HTTP Client&Server: GET Request not supported.
 
+Also provides command-line tool `jsonrcp2client`.
+
 
 ## Installation
 
 ```sh
 go get github.com/powerman/rpc-codec/...
+```
+
+## Usage
+
+### jsonrcp2client
+
+```
+$ jsonrcp2client
+Usage: jsonrpc2client [flags] method params-as-json
+  -http.endpoint string
+        service endpoint as url
+  -notification
+        send notification request
+  -tcp.addr string
+        service endpoint as host:port
+  -transport string
+        transport (stdin|tcp|http) (default "http")
+  -version
+        print version
+$ jsonrcp2client -http.endpoint https://example.com/rpc method.name '{"namedArg":"value"}'
+$ jsonrcp2client -http.endpoint https://example.com/rpc method.name '["positionalValue"]'
 ```
