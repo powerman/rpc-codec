@@ -9,5 +9,5 @@ require (
 	github.com/hashicorp/nomad/api v0.0.0-20190523152228-f9dbcd6e9e9a
 	github.com/powerman/go-service-goswagger-clean-example v0.2.0
 	github.com/powerman/must v0.1.0
-	github.com/powerman/structlog v0.3.0
+	github.com/powerman/structlog v0.5.0
 )
