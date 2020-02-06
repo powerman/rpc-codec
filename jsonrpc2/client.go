@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/rpc"
 	"reflect"
+	"strconv"
 	"sync"
 )
 
@@ -119,9 +120,32 @@ func (r *clientResponse) reset() {
 	r.Error = nil
 }
 
+// fixId ...
+func fixId(raw []byte) []byte {
+	data := map[string]interface{}{}
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return raw
+	}
+
+	if id, ok := data["id"]; ok {
+		data["id"] = 0
+		if sid, ok := id.(string); ok {
+			i, _ := strconv.Atoi(sid)
+			data["id"] = i
+		}
+	}
+
+	out, err := json.Marshal(data)
+	if err != nil {
+		return raw
+	}
+	return out
+}
+
 func (r *clientResponse) UnmarshalJSON(raw []byte) error {
 	r.reset()
 	type resp *clientResponse
+	raw = fixId(raw)
 	if err := json.Unmarshal(raw, resp(r)); err != nil {
 		return errors.New("bad response: " + string(raw))
 	}
