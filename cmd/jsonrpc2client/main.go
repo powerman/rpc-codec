@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/powerman/rpc-codec/jsonrpc2"
+	"github.com/seanhagen/rpc-codec/jsonrpc2"
 )
 
 const (
