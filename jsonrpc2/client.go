@@ -128,7 +128,6 @@ func fixId(raw []byte) []byte {
 	}
 
 	if id, ok := data["id"]; ok {
-		data["id"] = 0
 		if sid, ok := id.(string); ok {
 			i, _ := strconv.Atoi(sid)
 			data["id"] = i
