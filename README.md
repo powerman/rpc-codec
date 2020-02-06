@@ -1,6 +1,8 @@
-# JSON-RPC 2.0 [![GoDoc](https://godoc.org/github.com/powerman/rpc-codec/jsonrpc2?status.svg)](http://godoc.org/github.com/powerman/rpc-codec/jsonrpc2) [![CircleCI](https://circleci.com/gh/powerman/rpc-codec.svg?style=svg)](https://circleci.com/gh/powerman/rpc-codec) [![Coverage Status](https://coveralls.io/repos/powerman/rpc-codec/badge.svg?branch=master&service=github)](https://coveralls.io/github/powerman/rpc-codec?branch=master) [![Go Report Card](https://goreportcard.com/badge/github.com/powerman/rpc-codec)](https://goreportcard.com/report/github.com/powerman/rpc-codec)
+# JSON-RPC 2.0 [![GoDoc](https://godoc.org/github.com/seanhagen/rpc-codec/jsonrpc2?status.svg)](http://godoc.org/github.com/powerman/rpc-codec/jsonrpc2) 
 
 jsonrpc2 is a codec for net/rpc.
+
+Forked to add some handling for RPC services that don't perfectly adhere to the spec.
 
 Implements [JSON-RPC 2.0](http://www.jsonrpc.org/specification) and
 [JSON-RPC 2.0 Transport: HTTP](http://www.simple-is-better.org/json-rpc/transport_http.html)
