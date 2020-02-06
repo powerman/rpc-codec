@@ -155,11 +155,16 @@ func (r *clientResponse) UnmarshalJSON(raw []byte) error {
 	}
 	_, okVer := o["jsonrpc"]
 	_, okID := o["id"]
-	_, okRes := o["result"]
+	resV, okRes := o["result"]
 	errV, okErr := o["error"]
 	if okErr && errV == nil {
 		okErr = false
 		delete(o, "error")
+	}
+
+	if okRes && resV == nil {
+		okRes = false
+		delete(o, "result")
 	}
 
 	if !okVer || !okID || !(okRes || okErr) || (okRes && okErr) || len(o) > 3 {
