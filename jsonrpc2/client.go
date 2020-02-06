@@ -133,7 +133,12 @@ func (r *clientResponse) UnmarshalJSON(raw []byte) error {
 	_, okVer := o["jsonrpc"]
 	_, okID := o["id"]
 	_, okRes := o["result"]
-	_, okErr := o["error"]
+	errV, okErr := o["error"]
+	if okErr && errV == nil {
+		okErr = false
+		delete(o, "error")
+	}
+
 	if !okVer || !okID || !(okRes || okErr) || (okRes && okErr) || len(o) > 3 {
 		return errors.New("bad response: " + string(raw))
 	}
