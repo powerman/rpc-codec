@@ -62,6 +62,13 @@ func init() {
 	_ = rpc.Register(&CtxSvc{})
 }
 
+func TestNoContext(t *testing.T) {
+	var c jsonrpc2.Ctx
+	if c.Context() != context.Background() {
+		t.Fatal("empty context")
+	}
+}
+
 // - for each of these servers:
 //   * TCP server without context
 //   * TCP server with context
