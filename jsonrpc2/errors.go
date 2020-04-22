@@ -104,13 +104,13 @@ func WrapError(err error) error {
 	if err == nil || err == rpc.ErrShutdown || err == io.ErrUnexpectedEOF {
 		return err
 	}
-	return wrapError{err: ServerError(err)}
+	return &wrapError{err: ServerError(err)}
 }
 
-func (e wrapError) Error() string {
+func (e *wrapError) Error() string {
 	return fmt.Sprintf("%d %s", e.err.Code, e.err.Message)
 }
 
-func (e wrapError) Unwrap() error {
+func (e *wrapError) Unwrap() error {
 	return e.err
 }
