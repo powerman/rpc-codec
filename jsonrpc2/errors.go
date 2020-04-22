@@ -3,6 +3,8 @@ package jsonrpc2
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/rpc"
 	"strings"
 )
 
@@ -89,4 +91,26 @@ func (e *Error) Error() string {
 		return fmt.Sprintf(`{"code":%d,"message":%s}`, errServerError.Code, string(msg))
 	}
 	return string(buf)
+}
+
+type wrapError struct {
+	err *Error
+}
+
+// WrapError handles any error returned by Client.Call() by wrapping Error
+// returned by ServerError or returning non-ServerError errors as is.
+// Wrapped Error is stringified to "<code> <message>" instead of JSON.
+func WrapError(err error) error {
+	if err == nil || err == rpc.ErrShutdown || err == io.ErrUnexpectedEOF {
+		return err
+	}
+	return wrapError{err: ServerError(err)}
+}
+
+func (e wrapError) Error() string {
+	return fmt.Sprintf("%d %s", e.err.Code, e.err.Message)
+}
+
+func (e wrapError) Unwrap() error {
+	return e.err
 }

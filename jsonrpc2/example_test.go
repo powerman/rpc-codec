@@ -165,20 +165,14 @@ func Example() {
 	clientHTTP.Call("ExampleSvc.FullName3", NameArg{"First", "Last"}, nil)
 
 	// Correct error handling.
-	err = clientTCP.Call("ExampleSvc.Err1", nil, nil)
-	if err == rpc.ErrShutdown || err == io.ErrUnexpectedEOF {
-		fmt.Printf("Err1(): %q\n", err)
-	} else if err != nil {
-		rpcerr := jsonrpc2.ServerError(err)
-		fmt.Printf("Err1(): code=%d msg=%q data=%v\n", rpcerr.Code, rpcerr.Message, rpcerr.Data)
-	}
+	err = jsonrpc2.WrapError(clientTCP.Call("ExampleSvc.Err1", nil, nil))
+	fmt.Printf("Err1(): %q\n", err)
 
-	err = clientCustomHTTP.Call("ExampleSvc.Err2", nil, nil)
-	if err == rpc.ErrShutdown || err == io.ErrUnexpectedEOF {
-		fmt.Printf("Err2(): %q\n", err)
-	} else if err != nil {
-		rpcerr := jsonrpc2.ServerError(err)
+	err = jsonrpc2.WrapError(clientCustomHTTP.Call("ExampleSvc.Err2", nil, nil))
+	if rpcerr := new(jsonrpc2.Error); errors.As(err, &rpcerr) {
 		fmt.Printf("Err2(): code=%d msg=%q data=%v\n", rpcerr.Code, rpcerr.Message, rpcerr.Data)
+	} else if err != nil {
+		fmt.Printf("Err2(): %q\n", err)
 	}
 
 	err = clientHTTP.Call("ExampleSvc.Err3", nil, nil)
@@ -195,7 +189,7 @@ func Example() {
 	// MapLen({a:10,b:20,c:30})=3
 	// FullName2(): Remote IP is 127.0.0.1
 	// FullName3(): Remote IP is 127.0.0.1
-	// Err1(): code=-32000 msg="some issue" data=<nil>
+	// Err1(): "-32000 some issue"
 	// Err2(): code=-32603 msg="bad HTTP Status: 415 Unsupported Media Type" data=<nil>
 	// Err3(): code=42 msg="some issue" data=[one two]
 }
