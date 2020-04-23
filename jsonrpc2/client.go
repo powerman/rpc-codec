@@ -172,7 +172,7 @@ func (c *clientCodec) ReadResponseHeader(r *rpc.Response) error {
 	// - client will be shutdown
 	// So, return io.EOF as is, return *Error for all other errors.
 	if err := c.dec.Decode(&c.resp); err != nil {
-		if err == io.EOF {
+		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			return err
 		}
 		return NewError(errInternal.Code, err.Error())
