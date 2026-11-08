@@ -9,7 +9,7 @@ import (
 )
 
 // FatalUsage report usage error in same way as flag.Parse().
-func FatalUsage(format string, a ...interface{}) {
+func FatalUsage(format string, a ...any) {
 	if format != "" {
 		fmt.Fprintf(os.Stderr, format, a...)
 	}
@@ -18,7 +18,7 @@ func FatalUsage(format string, a ...interface{}) {
 }
 
 // FatalFlagValue report invalid flag values in same way as flag.Parse().
-func FatalFlagValue(msg, name string, val interface{}) {
+func FatalFlagValue(msg, name string, val any) {
 	FatalUsage("invalid value %#v for flag -%s: %s\n", val, name, msg)
 }
 

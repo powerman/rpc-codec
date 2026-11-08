@@ -95,7 +95,7 @@ func (r *serverRequest) UnmarshalJSON(raw []byte) error {
 		return errors.New("bad request")
 	}
 
-	var o = make(map[string]*json.RawMessage)
+	o := make(map[string]*json.RawMessage)
 	if err := json.Unmarshal(raw, &o); err != nil {
 		return errors.New("bad request")
 	}
@@ -139,8 +139,8 @@ func (r *serverRequest) UnmarshalJSON(raw []byte) error {
 type serverResponse struct {
 	Version string           `json:"jsonrpc"`
 	ID      *json.RawMessage `json:"id"`
-	Result  interface{}      `json:"result,omitempty"`
-	Error   interface{}      `json:"error,omitempty"`
+	Result  any              `json:"result,omitempty"`
+	Error   any              `json:"error,omitempty"`
 }
 
 func (c *serverCodec) ReadRequestHeader(r *rpc.Request) (err error) {
@@ -184,7 +184,7 @@ func (c *serverCodec) ReadRequestHeader(r *rpc.Request) (err error) {
 	return nil
 }
 
-func (c *serverCodec) ReadRequestBody(x interface{}) error {
+func (c *serverCodec) ReadRequestBody(x any) error {
 	// If x!=nil and return error e:
 	// - WriteResponse() will be called with e.Error() in r.Error
 	if x == nil {
@@ -213,7 +213,7 @@ func (c *serverCodec) ReadRequestBody(x interface{}) error {
 
 var null = json.RawMessage([]byte("null")) //nolint:gochecknoglobals
 
-func (c *serverCodec) WriteResponse(r *rpc.Response, x interface{}) error {
+func (c *serverCodec) WriteResponse(r *rpc.Response, x any) error {
 	// If return error: nothing happens.
 	// In r.Error will be "" or .Error() of error returned by:
 	// - ReadRequestBody()

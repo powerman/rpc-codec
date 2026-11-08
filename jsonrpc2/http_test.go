@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+
 	"net/http"
 	"net/http/httptest"
 	"net/rpc"
@@ -84,7 +84,7 @@ func TestHTTPServer(t *testing.T) {
 		if resp.Header.Get("Content-Type") != contentType {
 			t.Errorf("Do(%s %s), Content-Type = %q, want = %q", c.method, ts.URL, resp.Header.Get("Content-Type"), contentType)
 		}
-		got, err := ioutil.ReadAll(resp.Body)
+		got, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Errorf("ReadAll(), err = %v", err)
 		}
@@ -93,7 +93,7 @@ func TestHTTPServer(t *testing.T) {
 				t.Errorf("Do(%s %s)\nexp: %#q\ngot: %#q", c.method, ts.URL, c.reply, string(bytes.TrimRight(got, "\n")))
 			}
 		} else {
-			var jgot, jwant interface{}
+			var jgot, jwant any
 			if err := json.Unmarshal(got, &jgot); err != nil {
 				t.Errorf("Do(%s %s), output err = %v\ngot: %#q", c.method, ts.URL, err, string(bytes.TrimRight(got, "\n")))
 			}

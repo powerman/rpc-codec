@@ -45,13 +45,13 @@ func NewClientCodec(conn io.ReadWriteCloser) rpc.ClientCodec {
 }
 
 type clientRequest struct {
-	Version string      `json:"jsonrpc"`
-	Method  string      `json:"method"`
-	Params  interface{} `json:"params,omitempty"`
-	ID      *uint64     `json:"id,omitempty"`
+	Version string  `json:"jsonrpc"`
+	Method  string  `json:"method"`
+	Params  any     `json:"params,omitempty"`
+	ID      *uint64 `json:"id,omitempty"`
 }
 
-func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
+func (c *clientCodec) WriteRequest(r *rpc.Request, param any) error {
 	// If return error: it will be returned as is for this call.
 	// Allow param to be only Array, Slice, Map or Struct.
 	// When param is nil or uninitialized Map or Slice - omit "params".
@@ -68,7 +68,7 @@ func (c *clientCodec) WriteRequest(r *rpc.Request, param interface{}) error {
 				param = nil
 			}
 		case reflect.Array, reflect.Struct:
-		case reflect.Ptr:
+		case reflect.Pointer:
 			switch kk := reflect.TypeOf(param).Elem().Kind(); kk {
 			case reflect.Map:
 				if reflect.TypeOf(param).Elem().Key().Kind() == reflect.String {
@@ -126,7 +126,7 @@ func (r *clientResponse) UnmarshalJSON(raw []byte) error {
 		return errors.New("bad response: " + string(raw))
 	}
 
-	var o = make(map[string]*json.RawMessage)
+	o := make(map[string]*json.RawMessage)
 	if err := json.Unmarshal(raw, &o); err != nil {
 		return errors.New("bad response: " + string(raw))
 	}
@@ -194,7 +194,7 @@ func (c *clientCodec) ReadResponseHeader(r *rpc.Response) error {
 	return nil
 }
 
-func (c *clientCodec) ReadResponseBody(x interface{}) error {
+func (c *clientCodec) ReadResponseBody(x any) error {
 	// If x!=nil and return error e:
 	// - this call get e.Error() appended to "reading body "
 	// - other pending calls get error as is XXX actually other calls
@@ -228,7 +228,7 @@ type Client struct {
 
 // Notify try to invoke the named function. It return error only in case
 // it wasn't able to send request.
-func (c Client) Notify(serviceMethod string, args interface{}) error {
+func (c Client) Notify(serviceMethod string, args any) error {
 	req := &rpc.Request{
 		ServiceMethod: serviceMethod,
 		Seq:           seqNotify,

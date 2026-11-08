@@ -173,7 +173,7 @@ func (conn *httpClientConn) Write(buf []byte) (int, error) {
 		res.Error = NewError(errInternal.Code, err.Error())
 		buf := &bytes.Buffer{}
 		_ = json.NewEncoder(buf).Encode(res)
-		conn.ready <- ioutil.NopCloser(buf)
+		conn.ready <- io.NopCloser(buf)
 	}()
 	return len(buf), nil
 }

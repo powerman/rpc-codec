@@ -70,14 +70,15 @@ func TestNoContext(t *testing.T) {
 }
 
 // - for each of these servers:
-//   * TCP server without context
-//   * TCP server with context
-//   * HTTP server with context
+//   - TCP server without context
+//   - TCP server with context
+//   - HTTP server with context
+//
 // - call these methods:
-//   * Sum()
-//   * Name()
-//   * NameCtx()
-//   * TODO batch call all
+//   - Sum()
+//   - Name()
+//   - NameCtx()
+//   - TODO batch call all
 func TestContext(t *testing.T) {
 	// Server provide a TCP transport without context.
 	serverTCPNoCtx, err := net.Listen("tcp", "127.0.0.1:0")
@@ -143,48 +144,84 @@ func TestContext(t *testing.T) {
 		client     *jsonrpc2.Client
 		clientName string
 		method     string
-		arg        interface{}
-		want       interface{}
+		arg        any
+		want       any
 	}{
-		{clientTCPNoCtx, "clientTCPNoCtx",
-			"CtxSvc.Sum", [2]int{3, 5}, 8.0},
-		{clientTCP, "clientTCP",
-			"CtxSvc.Sum", [2]int{3, 5}, 8.0},
-		{clientHTTP, "clientHTTP",
-			"CtxSvc.Sum", [2]int{3, 5}, 8.0},
-		{clientTCPNoCtx, "clientTCPNoCtx",
-			"CtxSvc.Name", NameArg{"First", "Last"}, map[string]interface{}{
+		{
+			clientTCPNoCtx, "clientTCPNoCtx",
+			"CtxSvc.Sum",
+			[2]int{3, 5},
+			8.0,
+		},
+		{
+			clientTCP, "clientTCP",
+			"CtxSvc.Sum",
+			[2]int{3, 5},
+			8.0,
+		},
+		{
+			clientHTTP, "clientHTTP",
+			"CtxSvc.Sum",
+			[2]int{3, 5},
+			8.0,
+		},
+		{
+			clientTCPNoCtx, "clientTCPNoCtx",
+			"CtxSvc.Name",
+			NameArg{"First", "Last"},
+			map[string]any{
 				"Name": "First Last",
-			}},
-		{clientTCP, "clientTCP",
-			"CtxSvc.Name", NameArg{"First", "Last"}, map[string]interface{}{
+			},
+		},
+		{
+			clientTCP, "clientTCP",
+			"CtxSvc.Name",
+			NameArg{"First", "Last"},
+			map[string]any{
 				"Name": "First Last",
-			}},
-		{clientHTTP, "clientHTTP",
-			"CtxSvc.Name", NameArg{"First", "Last"}, map[string]interface{}{
+			},
+		},
+		{
+			clientHTTP, "clientHTTP",
+			"CtxSvc.Name",
+			NameArg{"First", "Last"},
+			map[string]any{
 				"Name": "First Last",
-			}},
-		{clientTCPNoCtx, "clientTCPNoCtx",
-			"CtxSvc.NameCtx", NameArg{"First", "Last"}, map[string]interface{}{
+			},
+		},
+		{
+			clientTCPNoCtx, "clientTCPNoCtx",
+			"CtxSvc.NameCtx",
+			NameArg{"First", "Last"},
+			map[string]any{
 				"Name":           "First Last",
 				"TCPRemoteAddr":  "",
 				"HTTPRemoteAddr": "",
-			}},
-		{clientTCP, "clientTCP",
-			"CtxSvc.NameCtx", NameArg{"First", "Last"}, map[string]interface{}{
+			},
+		},
+		{
+			clientTCP, "clientTCP",
+			"CtxSvc.NameCtx",
+			NameArg{"First", "Last"},
+			map[string]any{
 				"Name":           "First Last",
 				"TCPRemoteAddr":  "127.0.0.1",
 				"HTTPRemoteAddr": "",
-			}},
-		{clientHTTP, "clientHTTP",
-			"CtxSvc.NameCtx", NameArg{"First", "Last"}, map[string]interface{}{
+			},
+		},
+		{
+			clientHTTP, "clientHTTP",
+			"CtxSvc.NameCtx",
+			NameArg{"First", "Last"},
+			map[string]any{
 				"Name":           "First Last",
 				"TCPRemoteAddr":  "",
 				"HTTPRemoteAddr": "127.0.0.1",
-			}},
+			},
+		},
 	}
 	for _, v := range cases {
-		var res interface{}
+		var res any
 		err := v.client.Call(v.method, v.arg, &res)
 		if err != nil {
 			t.Errorf("%s.Call(%q) = %v", v.clientName, v.method, err)
@@ -200,11 +237,11 @@ func TestContextBatch(t *testing.T) {
 		{"jsonrpc":"2.0","id":0,"method":"CtxSvc.NameCtx","params":{}},
 		{"jsonrpc":"2.0","id":1,"method":"CtxSvc.NameCtx","params":{"Fname":"First","Lname":"Last"}}
 		]`
-	want := []map[string]interface{}{
+	want := []map[string]any{
 		{
 			"jsonrpc": "2.0",
 			"id":      0.0,
-			"result": map[string]interface{}{
+			"result": map[string]any{
 				"Name":           " ",
 				"TCPRemoteAddr":  "127.0.0.1",
 				"HTTPRemoteAddr": "",
@@ -213,7 +250,7 @@ func TestContextBatch(t *testing.T) {
 		{
 			"jsonrpc": "2.0",
 			"id":      1.0,
-			"result": map[string]interface{}{
+			"result": map[string]any{
 				"Name":           "First Last",
 				"TCPRemoteAddr":  "127.0.0.1",
 				"HTTPRemoteAddr": "",
@@ -226,7 +263,7 @@ func TestContextBatch(t *testing.T) {
 		&bufReadWriteCloser{buf},
 		nil,
 	))
-	var res []map[string]interface{}
+	var res []map[string]any
 	err := json.Unmarshal(buf.Bytes(), &res)
 	if err != nil {
 		t.Fatal(err)
@@ -240,11 +277,11 @@ func TestContextBatch(t *testing.T) {
 func TestContextBugNoContextWithoutParams(t *testing.T) {
 	cases := []struct {
 		req  string
-		want interface{}
+		want any
 	}{
 		{
 			`{"jsonrpc":"2.0","id":0,"method":"CtxSvc.NameCtx"}`,
-			map[string]interface{}{
+			map[string]any{
 				"Name":           " ",
 				"TCPRemoteAddr":  "127.0.0.1",
 				"HTTPRemoteAddr": "",
@@ -252,7 +289,7 @@ func TestContextBugNoContextWithoutParams(t *testing.T) {
 		},
 		{
 			`{"jsonrpc":"2.0","id":0,"method":"CtxSvc.NameCtx","params":{}}`,
-			map[string]interface{}{
+			map[string]any{
 				"Name":           " ",
 				"TCPRemoteAddr":  "127.0.0.1",
 				"HTTPRemoteAddr": "",
@@ -260,7 +297,7 @@ func TestContextBugNoContextWithoutParams(t *testing.T) {
 		},
 		{
 			`{"jsonrpc":"2.0","id":0,"method":"CtxSvc.NameCtx","params":{"Fname":"First","Lname":"Last"}}`,
-			map[string]interface{}{
+			map[string]any{
 				"Name":           "First Last",
 				"TCPRemoteAddr":  "127.0.0.1",
 				"HTTPRemoteAddr": "",
@@ -274,7 +311,7 @@ func TestContextBugNoContextWithoutParams(t *testing.T) {
 			&bufReadWriteCloser{buf},
 			nil,
 		))
-		var res map[string]interface{}
+		var res map[string]any
 		err := json.Unmarshal(buf.Bytes(), &res)
 		if err != nil {
 			t.Fatal(err)

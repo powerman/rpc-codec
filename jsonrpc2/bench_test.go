@@ -1,4 +1,4 @@
-// +build go1.3
+//go:build go1.3
 
 package jsonrpc2_test
 
@@ -14,7 +14,7 @@ import (
 )
 
 type client interface {
-	Call(string, interface{}, interface{}) error
+	Call(string, any, any) error
 }
 
 func benchmarkRPC(b *testing.B, client client) {

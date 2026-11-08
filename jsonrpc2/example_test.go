@@ -36,8 +36,10 @@ func (*ExampleSvc) MapLen(m map[string]int, res *int) error {
 	return nil
 }
 
-type NameArg struct{ Fname, Lname string }
-type NameRes struct{ Name string }
+type (
+	NameArg struct{ Fname, Lname string }
+	NameRes struct{ Name string }
+)
 
 // Method with named params.
 func (*ExampleSvc) FullName(t NameArg, res *NameRes) error {

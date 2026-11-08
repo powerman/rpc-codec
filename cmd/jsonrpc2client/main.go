@@ -50,7 +50,7 @@ func main() {
 	flag.Parse()
 
 	method, paramsJSON := flag.Arg(0), flag.Arg(1)
-	var params interface{}
+	var params any
 	err := json.Unmarshal([]byte(paramsJSON), &params)
 
 	switch {
@@ -86,7 +86,7 @@ func main() {
 		panic("never here")
 	}
 
-	var result interface{}
+	var result any
 	if cfg.notification {
 		err = client.Notify(method, params)
 	} else {

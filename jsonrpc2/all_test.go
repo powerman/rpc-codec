@@ -30,9 +30,9 @@ type Reply struct {
 type Arith int
 
 type ArithAddResp struct {
-	ID     interface{} `json:"id"`
-	Result Reply       `json:"result"`
-	Error  interface{} `json:"error"`
+	ID     any   `json:"id"`
+	Result Reply `json:"result"`
+	Error  any   `json:"error"`
 }
 
 func (t *Arith) Add(args *Args, reply *Reply) error {
@@ -100,7 +100,7 @@ func TestServer(t *testing.T) {
 	dec := json.NewDecoder(cli)
 
 	// Send hand-coded requests to server, parse responses.
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		fmt.Fprintf(cli, `{"jsonrpc": "2.0", "method": "Arith.Add", "id": "\u%04d", "params": {"A": %d, "B": %d}}`, i, i, i+1)
 		var resp ArithAddResp
 		err := dec.Decode(&resp)
@@ -218,7 +218,7 @@ func TestServerErrorHasNullResult(t *testing.T) {
 	}{
 		Reader: strings.NewReader(`{"jsonrpc": "2.0", "method": "Arith.Add", "id": "123", "params": []}`),
 		Writer: &out,
-		Closer: ioutil.NopCloser(nil),
+		Closer: io.NopCloser(nil),
 	}, nil)
 	r := new(rpc.Request)
 	if err := sc.ReadRequestHeader(r); err != nil {

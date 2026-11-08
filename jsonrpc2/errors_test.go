@@ -15,7 +15,6 @@ func TestWrapError(t *testing.T) {
 		{io.ErrUnexpectedEOF},
 	}
 	for _, tc := range tests {
-		tc := tc
 		t.Run("", func(t *testing.T) {
 			err := WrapError(tc.err)
 			if err != tc.err {
@@ -23,5 +22,4 @@ func TestWrapError(t *testing.T) {
 			}
 		})
 	}
-
 }
