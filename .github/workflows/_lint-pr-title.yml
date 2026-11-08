@@ -1,0 +1,13 @@
+name: Lint PR title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  main:
+    uses: powerman/.github/.github/workflows/lint-pr-title.yml@main

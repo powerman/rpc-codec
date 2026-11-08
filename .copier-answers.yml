@@ -1,0 +1,7 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: v33
+_src_path: ~/Templates/copier-go
+codegen: false
+custom_cliff: false
+project_name: rpc-codec
+type: go

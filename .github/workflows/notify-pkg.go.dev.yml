@@ -1,0 +1,23 @@
+name: Notify pkg.go.dev
+
+on:
+  workflow_dispatch:
+  push:
+    tags: [v*]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Trigger pkg.go.dev update
+        run: |
+          MOD=$(grep '^module ' go.mod | awk '{print $2}')
+          VERSION="${GITHUB_REF#refs/tags/}"
+          URL="https://pkg.go.dev/fetch/${MOD}@${VERSION}"
+          curl -sS --max-time 40 --retry 3 --retry-delay 60 --retry-connrefused -X POST "$URL"

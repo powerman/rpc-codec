@@ -1,4 +1,15 @@
-# JSON-RPC 2.0 [![GoDoc](https://godoc.org/github.com/powerman/rpc-codec/jsonrpc2?status.svg)](http://godoc.org/github.com/powerman/rpc-codec/jsonrpc2) [![CircleCI](https://circleci.com/gh/powerman/rpc-codec.svg?style=svg)](https://circleci.com/gh/powerman/rpc-codec) [![Coverage Status](https://coveralls.io/repos/powerman/rpc-codec/badge.svg?branch=master&service=github)](https://coveralls.io/github/powerman/rpc-codec?branch=master) [![Go Report Card](https://goreportcard.com/badge/github.com/powerman/rpc-codec)](https://goreportcard.com/report/github.com/powerman/rpc-codec)
+# JSON-RPC 2.0
+
+[![License MIT](https://img.shields.io/badge/license-MIT-royalblue.svg)](LICENSE)
+[![Go version](https://img.shields.io/github/go-mod/go-version/powerman/rpc-codec?color=blue)](https://go.dev/)
+[![Test](https://img.shields.io/github/actions/workflow/status/powerman/rpc-codec/test.yml?label=test)](https://github.com/powerman/rpc-codec/actions/workflows/test.yml)
+[![Coverage Status](https://raw.githubusercontent.com/powerman/rpc-codec/gh-badges/coverage.svg)](https://github.com/powerman/rpc-codec/actions/workflows/test.yml)
+[![Release](https://img.shields.io/github/v/release/powerman/rpc-codec?color=blue)](https://github.com/powerman/rpc-codec/releases/latest)
+[![Go Reference](https://pkg.go.dev/badge/github.com/powerman/rpc-codec.svg)](https://pkg.go.dev/github.com/powerman/rpc-codec)
+
+![Linux | amd64 arm64 armv7 ppc64le s390x riscv64](https://img.shields.io/badge/Linux-amd64%20arm64%20armv7%20ppc64le%20s390x%20riscv64-royalblue)
+![macOS | amd64 arm64](https://img.shields.io/badge/macOS-amd64%20arm64-royalblue)
+![Windows | amd64 arm64](https://img.shields.io/badge/Windows-amd64%20arm64-royalblue)
 
 jsonrpc2 is a codec for net/rpc.
 
@@ -11,7 +22,6 @@ specifications with following limitations:
 - HTTP Client&Server: GET Request not supported.
 
 Also provides command-line tool `jsonrpc2client`.
-
 
 ## Installation
 
@@ -32,7 +42,7 @@ curl -sfL $(curl -s https://api.github.com/repos/powerman/rpc-codec/releases/lat
 
 ### jsonrpc2client
 
-```
+```console
 $ jsonrpc2client -h
 Usage: jsonrpc2client [flags] method params-as-json
   -http.endpoint string

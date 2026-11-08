@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push: # To create/update release PR and to make a release.
+  pull_request: # To update release PR after manually changing version for the next release.
+    types: [edited]
+
+permissions:
+  contents: write # To create/update release_pr branch, create a release and a tag.
+  pull-requests: write # To create/update PR from release_pr branch.
+  id-token: write # For cosign signing.
+
+env:
+  GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+jobs:
+  release-pr:
+    uses: powerman/workflows/.github/workflows/release-pr.yml@v0.4.5
+    secrets:
+      TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+  # Mark release as non-draft and latest.
+  finalize:
+    needs: [release-pr]
+    if: ${{ needs.release-pr.outputs.result == 'released' }}
+    permissions:
+      contents: write # To update the GitHub release.
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ env.GITHUB_TOKEN }}
+          tag_name: ${{ needs.release-pr.outputs.version }}
+          body: ${{ needs.release-pr.outputs.changelog }}
+          draft: false
+          prerelease: ${{ needs.release-pr.outputs.prerelease }}
+          make_latest: ${{ needs.release-pr.outputs.prerelease != 'true' }}
