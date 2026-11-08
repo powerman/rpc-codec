@@ -9,7 +9,7 @@ npm.package_manager = 'pnpm' # Avoid .mise/locks/** sidecars required by default
 [tools]
 node = 'lts'
 pnpm = 'latest'
-go = '1.26'
+go = ['latest', '1.26']
 
 #--- Format
 # Opinionated Code Formatter.
@@ -178,6 +178,11 @@ run = 'GOOS=windows go test -c -o /dev/null ./...'
 
 [tasks.'test:go']
 description = 'Run Go tests for a whole project'
+run = 'gotestsum -- -race -timeout=60s ./...'
+
+[tasks.'test:go-1_26']
+description = 'Run Go tests for a whole project using the oldest supported Go version'
+tools = { go = '1.26' }
 run = 'gotestsum -- -race -timeout=60s ./...'
 
 [tasks.'cover:go:total']
