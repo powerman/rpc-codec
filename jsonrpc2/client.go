@@ -117,17 +117,11 @@ type clientResponse struct {
 	Error   *Error           `json:"error,omitempty"`
 }
 
-func (r *clientResponse) reset() {
-	r.Version = ""
-	r.ID = nil
-	r.Result = nil
-	r.Error = nil
-}
-
 func (r *clientResponse) UnmarshalJSON(raw []byte) error {
-	r.reset()
-	type resp *clientResponse
-	err := json.Unmarshal(raw, resp(r))
+	// Type plain has no methods, so json.Unmarshal won't call UnmarshalJSON recursively.
+	type plain clientResponse
+	*r = clientResponse{}
+	err := json.Unmarshal(raw, (*plain)(r))
 	if err != nil {
 		return badResponse(raw)
 	}

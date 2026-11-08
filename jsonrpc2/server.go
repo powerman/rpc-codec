@@ -89,14 +89,13 @@ type serverRequest struct {
 }
 
 func (r *serverRequest) UnmarshalJSON(raw []byte) error {
-	type alias serverRequest
-
-	var req alias
-	err := json.Unmarshal(raw, &req)
+	// Type plain has no methods, so json.Unmarshal won't call UnmarshalJSON recursively.
+	type plain serverRequest
+	*r = serverRequest{}
+	err := json.Unmarshal(raw, (*plain)(r))
 	if err != nil {
 		return errBadRequest
 	}
-	*r = serverRequest(req)
 
 	o := make(map[string]*json.RawMessage)
 	err = json.Unmarshal(raw, &o)
