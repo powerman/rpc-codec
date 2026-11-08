@@ -4,19 +4,30 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"net/rpc"
 )
 
-const contentType = "application/json"
+const (
+	contentType = "application/json"
+	// Max size of unneeded response body to read so underlying TCP connection will be re-used.
+	maxBodySlurpSize = 32 * 1024
+	// Max amount of received responses not yet read by [rpc.Client].
+	readyQueueSize = 16
+)
+
+var (
+	errBadContentType = errors.New("bad HTTP Content-Type")
+	errBadStatus      = errors.New("bad HTTP Status")
+)
 
 type contextKey int
 
-var httpRequestContextKey contextKey //nolint:gochecknoglobals
+const httpRequestContextKey contextKey = 0
 
 // HTTPRequestFromContext returns HTTP request related to this RPC (if
 // you use HTTPHander to serve JSON RPC 2.0 over HTTP) or nil otherwise.
@@ -40,7 +51,7 @@ func (conn *httpServerConn) Write(buf []byte) (int, error) {
 	return conn.res.Write(buf)
 }
 
-func (conn *httpServerConn) Close() error {
+func (*httpServerConn) Close() error {
 	return nil
 }
 
@@ -51,7 +62,7 @@ type httpHandler struct {
 // HTTPHandler returns handler for HTTP requests which will execute
 // incoming JSON-RPC 2.0 over HTTP using srv.
 //
-// If srv is nil then rpc.DefaultServer will be used.
+// If srv is nil then [rpc.DefaultServer] will be used.
 //
 // Specification: http://www.simple-is-better.org/json-rpc/transport_http.html
 func HTTPHandler(srv *rpc.Server) http.Handler {
@@ -64,7 +75,7 @@ func HTTPHandler(srv *rpc.Server) http.Handler {
 func (h *httpHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", contentType)
 
-	if req.Method != "POST" {
+	if req.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
@@ -128,54 +139,67 @@ func (conn *httpClientConn) Read(buf []byte) (int, error) {
 func (conn *httpClientConn) Write(buf []byte) (int, error) {
 	b := make([]byte, len(buf))
 	copy(b, buf)
-	go func() {
-		req, err := http.NewRequest("POST", conn.url, bytes.NewReader(b))
-		if err == nil {
-			req.Header.Add("Content-Type", contentType)
-			req.Header.Add("Accept", contentType)
-			var resp *http.Response
-			resp, err = conn.doer.Do(req)
-			const maxBodySlurpSize = 32 * 1024
-
-			if err == nil {
-				mediaType, _, err2 := mime.ParseMediaType(resp.Header.Get("Content-Type"))
-				switch {
-				case mediaType != contentType || err2 != nil:
-					err = fmt.Errorf("bad HTTP Content-Type: %s", resp.Header.Get("Content-Type"))
-				case resp.StatusCode == http.StatusOK:
-					conn.ready <- resp.Body
-					return
-				case resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusAccepted:
-					// Read the body if small so underlying TCP connection will be re-used.
-					// No need to check for errors: if it fails, Transport won't reuse it anyway.
-					if resp.ContentLength == -1 || resp.ContentLength <= maxBodySlurpSize {
-						_, _ = io.CopyN(ioutil.Discard, resp.Body, maxBodySlurpSize)
-					}
-					logIfFail(resp.Body.Close)
-					return
-				default:
-					err = fmt.Errorf("bad HTTP Status: %s", resp.Status)
-				}
-			}
-			if resp != nil {
-				// Read the body if small so underlying TCP connection will be re-used.
-				// No need to check for errors: if it fails, Transport won't reuse it anyway.
-				if resp.ContentLength == -1 || resp.ContentLength <= maxBodySlurpSize {
-					_, _ = io.CopyN(ioutil.Discard, resp.Body, maxBodySlurpSize)
-				}
-				logIfFail(resp.Body.Close)
-			}
-		}
-		var res clientResponse
-		if json.Unmarshal(b, &res) == nil && res.ID == nil {
-			return // ignore error from Notification
-		}
-		res.Error = NewError(errInternal.Code, err.Error())
-		buf := &bytes.Buffer{}
-		_ = json.NewEncoder(buf).Encode(res)
-		conn.ready <- io.NopCloser(buf)
-	}()
+	go conn.roundTrip(b)
 	return len(buf), nil
+}
+
+// roundTrip sends request b and queues either a response body
+// or a response with error (unless b is a Notification) for Read.
+func (conn *httpClientConn) roundTrip(b []byte) {
+	err := conn.post(b)
+	if err == nil {
+		return
+	}
+	var res clientResponse
+	if json.Unmarshal(b, &res) == nil && res.ID == nil {
+		return // ignore error from Notification
+	}
+	res.Error = NewError(errInternal.Code, err.Error())
+	buf := &bytes.Buffer{}
+	_ = json.NewEncoder(buf).Encode(res) //nolint:errchkjson // Result is a valid JSON or nil, Error.Data is nil.
+	conn.ready <- io.NopCloser(buf)
+}
+
+// post sends request b and queues response body for Read (if any).
+func (conn *httpClientConn) post(b []byte) error {
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, conn.url, bytes.NewReader(b))
+	if err != nil {
+		return err
+	}
+	req.Header.Add("Content-Type", contentType)
+	req.Header.Add("Accept", contentType)
+	resp, err := conn.doer.Do(req) //nolint:bodyclose // Closed by discardBody or by Read.
+	if err != nil {
+		if resp != nil {
+			discardBody(resp)
+		}
+		return err
+	}
+
+	mediaType, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	switch {
+	case mediaType != contentType || err != nil:
+		err = fmt.Errorf("%w: %s", errBadContentType, resp.Header.Get("Content-Type"))
+	case resp.StatusCode == http.StatusOK:
+		conn.ready <- resp.Body
+		return nil
+	case resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusAccepted:
+		err = nil
+	default:
+		err = fmt.Errorf("%w: %s", errBadStatus, resp.Status)
+	}
+	discardBody(resp)
+	return err
+}
+
+// discardBody closes resp.Body after reading it if small,
+// so underlying TCP connection will be re-used.
+// No need to check for read errors: if it fails, Transport won't reuse it anyway.
+func discardBody(resp *http.Response) {
+	if resp.ContentLength == -1 || resp.ContentLength <= maxBodySlurpSize {
+		_, _ = io.CopyN(io.Discard, resp.Body, maxBodySlurpSize)
+	}
+	logIfFail(resp.Body.Close)
 }
 
 func (conn *httpClientConn) Close() error {
@@ -203,7 +227,7 @@ func NewCustomHTTPClient(url string, doer Doer) *Client {
 	return NewClient(&httpClientConn{
 		url:   url,
 		doer:  doer,
-		ready: make(chan io.ReadCloser, 16),
+		ready: make(chan io.ReadCloser, readyQueueSize),
 		close: make(chan struct{}),
 	})
 }

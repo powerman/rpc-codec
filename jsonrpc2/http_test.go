@@ -1,4 +1,3 @@
-// nolint:errcheck
 package jsonrpc2_test
 
 import (
@@ -6,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-
 	"net/http"
 	"net/http/httptest"
 	"net/rpc"
@@ -17,6 +15,10 @@ import (
 	"github.com/powerman/rpc-codec/jsonrpc2"
 )
 
+func init() {
+	_ = rpc.Register(&Svc{})
+}
+
 // Svc is an RPC service for testing.
 type Svc struct{}
 
@@ -25,11 +27,8 @@ func (*Svc) Sum(vals [2]int, res *int) error {
 	return nil
 }
 
-func init() {
-	_ = rpc.Register(&Svc{})
-}
-
 func TestHTTPServer(t *testing.T) {
+	t.Parallel()
 	const jBad = `{}`
 	const jSum = `{"jsonrpc":"2.0","id":0,"method":"Svc.Sum","params":[3,5]}`
 	const jNotify = `{"jsonrpc":"2.0","method":"Svc.Sum","params":[3,5]}`
@@ -61,10 +60,10 @@ func TestHTTPServer(t *testing.T) {
 	}
 
 	ts := httptest.NewServer(jsonrpc2.HTTPHandler(nil))
-	defer ts.Close()
+	t.Cleanup(func() { ts.Close() })
 
 	for _, c := range cases {
-		req, err := http.NewRequest(c.method, ts.URL, strings.NewReader(c.body))
+		req, err := http.NewRequestWithContext(t.Context(), c.method, ts.URL, strings.NewReader(c.body))
 		if err != nil {
 			t.Errorf("NewRequest(%s %s), err = %v", c.method, ts.URL, err)
 		}
@@ -92,26 +91,29 @@ func TestHTTPServer(t *testing.T) {
 			if len(got) != 0 {
 				t.Errorf("Do(%s %s)\nexp: %#q\ngot: %#q", c.method, ts.URL, c.reply, string(bytes.TrimRight(got, "\n")))
 			}
-		} else {
-			var jgot, jwant any
-			if err := json.Unmarshal(got, &jgot); err != nil {
-				t.Errorf("Do(%s %s), output err = %v\ngot: %#q", c.method, ts.URL, err, string(bytes.TrimRight(got, "\n")))
-			}
-			if err := json.Unmarshal([]byte(c.reply), &jwant); err != nil {
-				t.Errorf("Do(%s %s), expect err = %v\nexp: %#q", c.method, ts.URL, err, c.reply)
-			}
-			if !reflect.DeepEqual(jgot, jwant) {
-				t.Errorf("Do(%s %s)\nexp: %#q\ngot: %#q", c.method, ts.URL, c.reply, string(bytes.TrimRight(got, "\n")))
-			}
+			continue
+		}
+		var jgot, jwant any
+		err = json.Unmarshal(got, &jgot)
+		if err != nil {
+			t.Errorf("Do(%s %s), output err = %v\ngot: %#q", c.method, ts.URL, err, string(bytes.TrimRight(got, "\n")))
+		}
+		err = json.Unmarshal([]byte(c.reply), &jwant)
+		if err != nil {
+			t.Errorf("Do(%s %s), expect err = %v\nexp: %#q", c.method, ts.URL, err, c.reply)
+		}
+		if !reflect.DeepEqual(jgot, jwant) {
+			t.Errorf("Do(%s %s)\nexp: %#q\ngot: %#q", c.method, ts.URL, c.reply, string(bytes.TrimRight(got, "\n")))
 		}
 	}
 }
 
 func TestHTTPClient(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(jsonrpc2.HTTPHandler(nil))
-	defer ts.Close()
+	t.Cleanup(func() { ts.Close() })
 	client := jsonrpc2.NewHTTPClient(ts.URL)
-	defer client.Close()
+	t.Cleanup(func() { client.Close() })
 
 	var in [2]int
 	var got, want int
@@ -143,12 +145,13 @@ func TestHTTPClient(t *testing.T) {
 
 type ContentTypeHandler string
 
-func (h ContentTypeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h ContentTypeHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", string(h))
 	io.WriteString(w, `{"jsonrpc":"2.0","id":0,"result":8}`)
 }
 
 func TestHTTPClientContentType(t *testing.T) {
+	t.Parallel()
 	const contentType = "application/json"
 	cases := []struct {
 		contentType string

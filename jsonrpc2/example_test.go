@@ -1,4 +1,3 @@
-// nolint:errcheck
 package jsonrpc2_test
 
 import (
@@ -12,6 +11,8 @@ import (
 
 	"github.com/powerman/rpc-codec/jsonrpc2"
 )
+
+var errSomeIssue = errors.New("some issue")
 
 // A server wishes to export an object of type ExampleSvc:
 type ExampleSvc struct{}
@@ -52,8 +53,9 @@ type exampleContextKey string
 var RemoteAddrContextKey exampleContextKey = "RemoteAddr"
 
 type NameArgContext struct {
-	Fname, Lname string
 	jsonrpc2.Ctx
+
+	Fname, Lname string
 }
 
 // Method with named params and TCP context.
@@ -74,7 +76,7 @@ func (*ExampleSvc) FullName3(t NameArgContext, res *NameRes) error {
 
 // Method returns error with code -32000.
 func (*ExampleSvc) Err1(struct{}, *struct{}) error {
-	return errors.New("some issue")
+	return errSomeIssue
 }
 
 // Method returns error with code 42.
@@ -91,8 +93,10 @@ func Example() {
 	// Server export an object of type ExampleSvc.
 	rpc.Register(&ExampleSvc{})
 
+	var lc net.ListenConfig
+
 	// Server provide a TCP transport.
-	lnTCP, err := net.Listen("tcp", "127.0.0.1:0")
+	lnTCP, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		panic(err)
 	}
@@ -110,7 +114,7 @@ func Example() {
 
 	// Server provide a HTTP transport on /rpc endpoint.
 	http.Handle("/rpc", jsonrpc2.HTTPHandler(nil))
-	lnHTTP, err := net.Listen("tcp", "127.0.0.1:0")
+	lnHTTP, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		panic(err)
 	}
@@ -144,11 +148,11 @@ func Example() {
 	var reply int
 
 	// Synchronous call using positional params and TCP.
-	err = clientTCP.Call("ExampleSvc.Sum", [2]int{3, 5}, &reply) // nolint:ineffassign
+	clientTCP.Call("ExampleSvc.Sum", [2]int{3, 5}, &reply)
 	fmt.Printf("Sum(3,5)=%d\n", reply)
 
 	// Synchronous call using positional params and HTTP.
-	err = clientHTTP.Call("ExampleSvc.SumAll", []int{3, 5, -2}, &reply) // nolint:ineffassign
+	clientHTTP.Call("ExampleSvc.SumAll", []int{3, 5, -2}, &reply)
 	fmt.Printf("SumAll(3,5,-2)=%d\n", reply)
 
 	// Asynchronous call using named params and TCP.
@@ -171,14 +175,14 @@ func Example() {
 	fmt.Printf("Err1(): %q\n", err)
 
 	err = jsonrpc2.WrapError(clientCustomHTTP.Call("ExampleSvc.Err2", nil, nil))
-	if rpcerr := new(jsonrpc2.Error); errors.As(err, &rpcerr) {
+	if rpcerr, ok := errors.AsType[*jsonrpc2.Error](err); ok {
 		fmt.Printf("Err2(): code=%d msg=%q data=%v\n", rpcerr.Code, rpcerr.Message, rpcerr.Data)
 	} else if err != nil {
 		fmt.Printf("Err2(): %q\n", err)
 	}
 
 	err = clientHTTP.Call("ExampleSvc.Err3", nil, nil)
-	if err == rpc.ErrShutdown || err == io.ErrUnexpectedEOF {
+	if errors.Is(err, rpc.ErrShutdown) || errors.Is(err, io.ErrUnexpectedEOF) {
 		fmt.Printf("Err3(): %q\n", err)
 	} else if err != nil {
 		rpcerr := jsonrpc2.ServerError(err)

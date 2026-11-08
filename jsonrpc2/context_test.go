@@ -1,15 +1,15 @@
-// nolint:errcheck
 package jsonrpc2_test
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"net"
 	"net/http"
 	"net/rpc"
 	"reflect"
-	"sort"
+	"slices"
 	"testing"
 
 	"github.com/powerman/rpc-codec/jsonrpc2"
@@ -18,6 +18,10 @@ import (
 type contextKey int
 
 var remoteAddrContextKey contextKey
+
+func init() {
+	_ = rpc.Register(&CtxSvc{})
+}
 
 // CtxSvc is an RPC service for testing.
 type CtxSvc struct{}
@@ -58,13 +62,10 @@ func (*CtxSvc) NameCtx(t NameArgContext, res *NameResCtx) error {
 	return nil
 }
 
-func init() {
-	_ = rpc.Register(&CtxSvc{})
-}
-
 func TestNoContext(t *testing.T) {
+	t.Parallel()
 	var c jsonrpc2.Ctx
-	if c.Context() != context.Background() {
+	if c.Context() != context.Background() { //nolint:usetesting // Must be exactly context.Background.
 		t.Fatal("empty context")
 	}
 }
@@ -80,12 +81,15 @@ func TestNoContext(t *testing.T) {
 //   - NameCtx()
 //   - TODO batch call all
 func TestContext(t *testing.T) {
+	t.Parallel()
+	var lc net.ListenConfig
+
 	// Server provide a TCP transport without context.
-	serverTCPNoCtx, err := net.Listen("tcp", "127.0.0.1:0")
+	serverTCPNoCtx, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer serverTCPNoCtx.Close()
+	t.Cleanup(func() { serverTCPNoCtx.Close() })
 	go func() {
 		for {
 			conn, err := serverTCPNoCtx.Accept()
@@ -97,48 +101,49 @@ func TestContext(t *testing.T) {
 	}()
 
 	// Server provide a TCP transport with context.
-	serverTCP, err := net.Listen("tcp", "127.0.0.1:0")
+	serverTCP, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer serverTCP.Close()
+	t.Cleanup(func() { serverTCP.Close() })
 	go func() {
 		for {
 			conn, err := serverTCP.Accept()
 			if err != nil {
 				return
 			}
-			ctx := context.WithValue(context.Background(), remoteAddrContextKey, conn.RemoteAddr())
+			ctx := context.WithValue(t.Context(), remoteAddrContextKey, conn.RemoteAddr())
 			go jsonrpc2.ServeConnContext(ctx, conn)
 		}
 	}()
 
 	// Server provide a HTTP transport with context.
-	http.Handle("/", jsonrpc2.HTTPHandler(nil))
-	serverHTTP, err := net.Listen("tcp", "127.0.0.1:0")
+	mux := http.NewServeMux()
+	mux.Handle("/", jsonrpc2.HTTPHandler(nil))
+	serverHTTP, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer serverHTTP.Close()
-	go http.Serve(serverHTTP, nil)
+	t.Cleanup(func() { serverHTTP.Close() })
+	go http.Serve(serverHTTP, mux)
 
 	// Client use TCP transport without context.
 	clientTCPNoCtx, err := jsonrpc2.Dial("tcp", serverTCPNoCtx.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer clientTCPNoCtx.Close()
+	t.Cleanup(func() { clientTCPNoCtx.Close() })
 
 	// Client use TCP transport with context.
 	clientTCP, err := jsonrpc2.Dial("tcp", serverTCP.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer clientTCP.Close()
+	t.Cleanup(func() { clientTCP.Close() })
 
 	// Client use HTTP transport with context.
 	clientHTTP := jsonrpc2.NewHTTPClient("http://" + serverHTTP.Addr().String() + "/")
-	defer clientHTTP.Close()
+	t.Cleanup(func() { clientHTTP.Close() })
 
 	cases := []struct {
 		client     *jsonrpc2.Client
@@ -233,6 +238,7 @@ func TestContext(t *testing.T) {
 }
 
 func TestContextBatch(t *testing.T) {
+	t.Parallel()
 	req := `[
 		{"jsonrpc":"2.0","id":0,"method":"CtxSvc.NameCtx","params":{}},
 		{"jsonrpc":"2.0","id":1,"method":"CtxSvc.NameCtx","params":{"Fname":"First","Lname":"Last"}}
@@ -259,7 +265,7 @@ func TestContextBatch(t *testing.T) {
 	}
 	buf := bytes.NewBufferString(req)
 	rpc.ServeRequest(jsonrpc2.NewServerCodecContext(
-		context.WithValue(context.Background(), remoteAddrContextKey, &net.TCPAddr{IP: net.ParseIP("127.0.0.1")}),
+		context.WithValue(t.Context(), remoteAddrContextKey, &net.TCPAddr{IP: net.ParseIP("127.0.0.1")}),
 		&bufReadWriteCloser{buf},
 		nil,
 	))
@@ -268,13 +274,14 @@ func TestContextBatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sort.Slice(res, func(i, j int) bool { return res[i]["id"].(float64) < res[j]["id"].(float64) })
+	slices.SortFunc(res, func(a, b map[string]any) int { return cmp.Compare(a["id"].(float64), b["id"].(float64)) })
 	if !reflect.DeepEqual(want, res) {
 		t.Errorf("%s:\n\n\texp: %#v\n\n\tgot: %#v\n\n", req, want, res)
 	}
 }
 
 func TestContextBugNoContextWithoutParams(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		req  string
 		want any
@@ -307,7 +314,7 @@ func TestContextBugNoContextWithoutParams(t *testing.T) {
 	for _, v := range cases {
 		buf := bytes.NewBufferString(v.req)
 		rpc.ServeRequest(jsonrpc2.NewServerCodecContext(
-			context.WithValue(context.Background(), remoteAddrContextKey, &net.TCPAddr{IP: net.ParseIP("127.0.0.1")}),
+			context.WithValue(t.Context(), remoteAddrContextKey, &net.TCPAddr{IP: net.ParseIP("127.0.0.1")}),
 			&bufReadWriteCloser{buf},
 			nil,
 		))
@@ -326,4 +333,4 @@ type bufReadWriteCloser struct {
 	*bytes.Buffer
 }
 
-func (b *bufReadWriteCloser) Close() error { return nil }
+func (*bufReadWriteCloser) Close() error { return nil }

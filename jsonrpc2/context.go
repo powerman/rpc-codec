@@ -6,7 +6,7 @@ import "context"
 // parameters type if you need access to request context in RPC method.
 //
 // Request context will be same as was provided to corresponding
-// ServeConnContext/NewServerCodecContext or context.Background otherwise.
+// ServeConnContext/NewServerCodecContext or [context.Background] otherwise.
 type WithContext interface {
 	Context() context.Context
 	SetContext(ctx context.Context)
@@ -20,7 +20,7 @@ type Ctx struct {
 }
 
 // Context returns ctx given to preceding SetContext call or
-// context.Background() otherwise.
+// [context.Background] otherwise.
 func (c *Ctx) Context() context.Context {
 	if c.ctx == nil {
 		return context.Background()
@@ -30,5 +30,5 @@ func (c *Ctx) Context() context.Context {
 
 // SetContext saves ctx for succeeding Context calls.
 func (c *Ctx) SetContext(ctx context.Context) {
-	c.ctx = ctx
+	c.ctx = ctx //nolint:fatcontext // Setter replaces the context instead of nesting it.
 }

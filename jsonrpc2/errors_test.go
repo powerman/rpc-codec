@@ -1,12 +1,15 @@
-package jsonrpc2
+package jsonrpc2_test
 
 import (
 	"io"
 	"net/rpc"
 	"testing"
+
+	"github.com/powerman/rpc-codec/jsonrpc2"
 )
 
 func TestWrapError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		err error
 	}{
@@ -16,8 +19,9 @@ func TestWrapError(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run("", func(t *testing.T) {
-			err := WrapError(tc.err)
-			if err != tc.err {
+			t.Parallel()
+			err := jsonrpc2.WrapError(tc.err)
+			if err != tc.err { //nolint:err113,errorlint // By design.
 				t.Errorf("got %v, want %v", err, tc.err)
 			}
 		})

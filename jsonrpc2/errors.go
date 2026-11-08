@@ -2,6 +2,7 @@ package jsonrpc2
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/rpc"
@@ -46,15 +47,15 @@ func newError(message string) *Error {
 }
 
 // ServerError convert errors returned by Client.Call() into Error.
-// User should check for rpc.ErrShutdown and io.ErrUnexpectedEOF before
+// User should check for [rpc.ErrShutdown] and [io.ErrUnexpectedEOF] before
 // calling ServerError.
 func ServerError(rpcerr error) *Error {
 	if rpcerr == nil {
 		return nil
 	}
-	if err, ok := rpcerr.(*Error); ok {
+	if err, ok := errors.AsType[*Error](rpcerr); ok {
 		if err.Code == errInternal.Code && err.Data != nil {
-			if err2, ok := err.Data.(*Error); ok {
+			if err2, isErr := err.Data.(*Error); isErr {
 				// Use alternate error when ReadResponseBody fail on other call.
 				return err2
 			}
@@ -84,10 +85,7 @@ func ServerError(rpcerr error) *Error {
 func (e *Error) Error() string {
 	buf, err := json.Marshal(e)
 	if err != nil {
-		msg, err := json.Marshal(err.Error())
-		if err != nil {
-			msg = []byte(`"` + errServerError.Message + `"`)
-		}
+		msg, _ := json.Marshal(err.Error())
 		return fmt.Sprintf(`{"code":%d,"message":%s}`, errServerError.Code, string(msg))
 	}
 	return string(buf)
@@ -101,7 +99,7 @@ type wrapError struct {
 // returned by ServerError or returning non-ServerError errors as is.
 // Wrapped Error is stringified to "<code> <message>" instead of JSON.
 func WrapError(err error) error {
-	if err == nil || err == rpc.ErrShutdown || err == io.ErrUnexpectedEOF {
+	if err == nil || errors.Is(err, rpc.ErrShutdown) || errors.Is(err, io.ErrUnexpectedEOF) {
 		return err
 	}
 	return &wrapError{err: ServerError(err)}

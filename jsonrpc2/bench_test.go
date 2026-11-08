@@ -1,5 +1,3 @@
-//go:build go1.3
-
 package jsonrpc2_test
 
 import (
@@ -14,10 +12,11 @@ import (
 )
 
 type client interface {
-	Call(string, any, any) error
+	Call(serviceMethod string, args, reply any) error
 }
 
 func benchmarkRPC(b *testing.B, client client) {
+	b.Helper()
 	b.ResetTimer()
 	// for n := 0; n < b.N; n++ {
 	b.RunParallel(func(pb *testing.PB) {
@@ -35,7 +34,9 @@ func benchmarkRPC(b *testing.B, client client) {
 }
 
 func listen(b *testing.B, serveConn func(conn io.ReadWriteCloser)) net.Listener {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	b.Helper()
+	var lc net.ListenConfig
+	ln, err := lc.Listen(b.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		b.Fatal(err)
 	}

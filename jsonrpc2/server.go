@@ -19,6 +19,11 @@ const (
 	protoVer    = "2.0"
 )
 
+var (
+	errBadRequest = errors.New("bad request")
+	errBadSeq     = errors.New("invalid sequence number in response")
+)
+
 type serverCodec struct {
 	encmutex sync.Mutex    // protects enc
 	dec      *json.Decoder // for reading JSON values
@@ -41,17 +46,27 @@ type serverCodec struct {
 	pending map[uint64]*json.RawMessage
 }
 
-// NewServerCodec returns a new rpc.ServerCodec using JSON-RPC 2.0 on conn,
+// NewServerCodec returns a new [rpc.ServerCodec] using JSON-RPC 2.0 on conn,
 // which will use srv to execute batch requests.
 //
-// If srv is nil then rpc.DefaultServer will be used.
+// If srv is nil then [rpc.DefaultServer] will be used.
 //
 // For most use cases NewServerCodec is too low-level and you should use
 // ServeConn instead. You'll need NewServerCodec if you wanna register
 // your own object of type named "JSONRPC2" (same as used internally to
 // process batch requests) or you wanna use custom rpc server object
-// instead of rpc.DefaultServer to process requests on conn.
+// instead of [rpc.DefaultServer] to process requests on conn.
 func NewServerCodec(conn io.ReadWriteCloser, srv *rpc.Server) rpc.ServerCodec {
+	return newServerCodec(context.Background(), conn, srv)
+}
+
+// NewServerCodecContext is NewServerCodec with given context provided
+// within parameters for compatible RPC methods.
+func NewServerCodecContext(ctx context.Context, conn io.ReadWriteCloser, srv *rpc.Server) rpc.ServerCodec {
+	return newServerCodec(ctx, conn, srv)
+}
+
+func newServerCodec(ctx context.Context, conn io.ReadWriteCloser, srv *rpc.Server) *serverCodec {
 	if srv == nil {
 		srv = rpc.DefaultServer
 	}
@@ -61,17 +76,9 @@ func NewServerCodec(conn io.ReadWriteCloser, srv *rpc.Server) rpc.ServerCodec {
 		enc:     json.NewEncoder(conn),
 		c:       conn,
 		srv:     srv,
-		ctx:     context.Background(),
+		ctx:     ctx,
 		pending: make(map[uint64]*json.RawMessage),
 	}
-}
-
-// NewServerCodecContext is NewServerCodec with given context provided
-// within parameters for compatible RPC methods.
-func NewServerCodecContext(ctx context.Context, conn io.ReadWriteCloser, srv *rpc.Server) rpc.ServerCodec {
-	codec := NewServerCodec(conn, srv)
-	codec.(*serverCodec).ctx = ctx
-	return codec
 }
 
 type serverRequest struct {
@@ -91,49 +98,62 @@ func (r *serverRequest) reset() {
 func (r *serverRequest) UnmarshalJSON(raw []byte) error {
 	r.reset()
 	type req *serverRequest
-	if err := json.Unmarshal(raw, req(r)); err != nil {
-		return errors.New("bad request")
+	err := json.Unmarshal(raw, req(r))
+	if err != nil {
+		return errBadRequest
 	}
 
 	o := make(map[string]*json.RawMessage)
-	if err := json.Unmarshal(raw, &o); err != nil {
-		return errors.New("bad request")
+	err = json.Unmarshal(raw, &o)
+	if err != nil {
+		return errBadRequest
 	}
 	if o["jsonrpc"] == nil || o["method"] == nil {
-		return errors.New("bad request")
+		return errBadRequest
 	}
 	_, okID := o["id"]
 	_, okParams := o["params"]
-	if len(o) == 3 && !(okID || okParams) || len(o) == 4 && !(okID && okParams) || len(o) > 4 {
-		return errors.New("bad request")
+	if len(o) == 3 && !okID && !okParams || len(o) == 4 && (!okID || !okParams) || len(o) > 4 {
+		return errBadRequest
 	}
 	if r.Version != protoVer {
-		return errors.New("bad request")
+		return errBadRequest
 	}
-	if okParams {
-		if r.Params == nil || len(*r.Params) == 0 {
-			return errors.New("bad request")
-		}
-		switch []byte(*r.Params)[0] {
-		case '[', '{':
-		default:
-			return errors.New("bad request")
-		}
+	if okParams && !isValidParams(r.Params) {
+		return errBadRequest
 	}
 	if okID && r.ID == nil {
 		r.ID = &null
 	}
-	if okID {
-		if len(*r.ID) == 0 {
-			return errors.New("bad request")
-		}
-		switch []byte(*r.ID)[0] {
-		case 't', 'f', '{', '[':
-			return errors.New("bad request")
-		}
+	if okID && !isValidID(*r.ID) {
+		return errBadRequest
 	}
 
 	return nil
+}
+
+func isValidParams(params *json.RawMessage) bool {
+	if params == nil || len(*params) == 0 {
+		return false
+	}
+	switch (*params)[0] {
+	case '[', '{':
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidID(id json.RawMessage) bool {
+	if len(id) == 0 {
+		return false
+	}
+	switch id[0] {
+	case 't', 'f', '{', '[':
+		return false
+	default:
+		return true
+	}
 }
 
 type serverResponse struct {
@@ -143,29 +163,19 @@ type serverResponse struct {
 	Error   any              `json:"error,omitempty"`
 }
 
-func (c *serverCodec) ReadRequestHeader(r *rpc.Request) (err error) {
+func (c *serverCodec) ReadRequestHeader(r *rpc.Request) error {
 	// If return error:
 	// - codec will be closed
 	// So, try to send error reply to client before returning error.
 	var raw json.RawMessage
-	if err := c.dec.Decode(&raw); err != nil {
-		c.encmutex.Lock()
-		_ = c.enc.Encode(serverResponse{Version: protoVer, ID: &null, Error: errParse})
-		c.encmutex.Unlock()
+	err := c.dec.Decode(&raw)
+	if err != nil {
+		c.writeError(errParse)
 		return err
 	}
 
-	if len(raw) > 0 && raw[0] == '[' {
-		c.req.Version = protoVer
-		c.req.Method = batchMethod
-		c.req.Params = &raw
-		c.req.ID = &null
-	} else if err := json.Unmarshal(raw, &c.req); err != nil {
-		if err.Error() == "bad request" {
-			c.encmutex.Lock()
-			_ = c.enc.Encode(serverResponse{Version: protoVer, ID: &null, Error: errRequest})
-			c.encmutex.Unlock()
-		}
+	err = c.parseRequest(raw)
+	if err != nil {
 		return err
 	}
 
@@ -184,6 +194,29 @@ func (c *serverCodec) ReadRequestHeader(r *rpc.Request) (err error) {
 	return nil
 }
 
+func (c *serverCodec) parseRequest(raw json.RawMessage) error {
+	if len(raw) > 0 && raw[0] == '[' {
+		c.req.Version = protoVer
+		c.req.Method = batchMethod
+		c.req.Params = &raw
+		c.req.ID = &null
+		return nil
+	}
+	err := json.Unmarshal(raw, &c.req)
+	if errors.Is(err, errBadRequest) {
+		c.writeError(errRequest)
+	}
+	return err
+}
+
+// writeError sends error reply on a best-effort basis:
+// it is called only when the codec is going to be closed anyway.
+func (c *serverCodec) writeError(rpcerr *Error) {
+	c.encmutex.Lock()
+	defer c.encmutex.Unlock()
+	_ = c.enc.Encode(serverResponse{Version: protoVer, ID: &null, Error: rpcerr}) //nolint:errchkjson // Best effort.
+}
+
 func (c *serverCodec) ReadRequestBody(x any) error {
 	// If x!=nil and return error e:
 	// - WriteResponse() will be called with e.Error() in r.Error
@@ -199,19 +232,23 @@ func (c *serverCodec) ReadRequestBody(x any) error {
 	if c.req.Method == batchMethod {
 		arg := x.(*BatchArg)
 		arg.srv = c.srv
-		if err := json.Unmarshal(*c.req.Params, &arg.reqs); err != nil {
+		err := json.Unmarshal(*c.req.Params, &arg.reqs)
+		if err != nil {
 			return NewError(errParams.Code, err.Error())
 		}
 		if len(arg.reqs) == 0 {
 			return errRequest
 		}
-	} else if err := json.Unmarshal(*c.req.Params, x); err != nil {
+		return nil
+	}
+	err := json.Unmarshal(*c.req.Params, x)
+	if err != nil {
 		return NewError(errParams.Code, err.Error())
 	}
 	return nil
 }
 
-var null = json.RawMessage([]byte("null")) //nolint:gochecknoglobals
+var null = json.RawMessage([]byte("null")) // Const.
 
 func (c *serverCodec) WriteResponse(r *rpc.Response, x any) error {
 	// If return error: nothing happens.
@@ -222,12 +259,12 @@ func (c *serverCodec) WriteResponse(r *rpc.Response, x any) error {
 	b, ok := c.pending[r.Seq]
 	if !ok {
 		c.mutex.Unlock()
-		return errors.New("invalid sequence number in response")
+		return errBadSeq
 	}
 	delete(c.pending, r.Seq)
 	c.mutex.Unlock()
 
-	if replies, ok := x.(*[]*json.RawMessage); r.ServiceMethod == batchMethod && ok {
+	if replies, isBatch := x.(*[]*json.RawMessage); r.ServiceMethod == batchMethod && isBatch {
 		if len(*replies) == 0 {
 			return nil
 		}

@@ -3,8 +3,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// nolint:errcheck
-package jsonrpc2
+package jsonrpc2_test
 
 import (
 	"bytes"
@@ -12,19 +11,30 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/rpc"
 	"strings"
 	"testing"
+
+	"github.com/powerman/rpc-codec/jsonrpc2"
 )
+
+var (
+	errDivideByZero = errors.New("divide by zero")
+	errUnexpected   = errors.New("unexpected error")
+	errNoTimeouts   = errors.New("net.Pipe does not support timeouts")
+)
+
+func init() {
+	_ = rpc.Register(new(Arith))
+}
 
 type Args struct {
 	A, B int
 }
 
 type Reply struct {
-	C int
+	C int `json:"c"`
 }
 
 type Arith int
@@ -35,68 +45,69 @@ type ArithAddResp struct {
 	Error  any   `json:"error"`
 }
 
-func (t *Arith) Add(args *Args, reply *Reply) error {
+func (*Arith) Add(args *Args, reply *Reply) error {
 	reply.C = args.A + args.B
 	return nil
 }
 
-func (t *Arith) Mul(args *Args, reply *Reply) error {
+func (*Arith) Mul(args *Args, reply *Reply) error {
 	reply.C = args.A * args.B
 	return nil
 }
 
-func (t *Arith) Div(args *Args, reply *Reply) error {
+func (*Arith) Div(args *Args, reply *Reply) error {
 	if args.B == 0 {
-		return errors.New("divide by zero")
+		return errDivideByZero
 	}
 	reply.C = args.A / args.B
 	return nil
 }
 
-func (t *Arith) Error(args *Args, reply *Reply) error {
+func (*Arith) Error(*Args, *Reply) error {
 	panic("ERROR")
 }
 
-func init() {
-	_ = rpc.Register(new(Arith))
-}
-
 func TestServerNoParams(t *testing.T) {
+	t.Parallel()
 	cli, srv := net.Pipe()
-	defer cli.Close()
-	go ServeConn(srv)
+	t.Cleanup(func() { cli.Close() })
+	go jsonrpc2.ServeConn(srv)
 	dec := json.NewDecoder(cli)
 
-	fmt.Fprintf(cli, `{"method": "Arith.Add", "id": "123"}`)
+	fmt.Fprint(cli, `{"method": "Arith.Add", "id": "123"}`)
 	var resp ArithAddResp
-	if err := dec.Decode(&resp); err != nil {
+	err := dec.Decode(&resp)
+	if err != nil {
 		t.Fatalf("Decode after no params: %s", err)
 	}
 	if resp.Error == nil {
-		t.Fatalf("Expected error, got nil")
+		t.Fatal("Expected error, got nil")
 	}
 }
 
 func TestServerEmptyMessage(t *testing.T) {
+	t.Parallel()
 	cli, srv := net.Pipe()
-	defer cli.Close()
-	go ServeConn(srv)
+	t.Cleanup(func() { cli.Close() })
+	go jsonrpc2.ServeConn(srv)
 	dec := json.NewDecoder(cli)
 
-	fmt.Fprintf(cli, "{}")
+	fmt.Fprint(cli, "{}")
 	var resp ArithAddResp
-	if err := dec.Decode(&resp); err != nil {
+	err := dec.Decode(&resp)
+	if err != nil {
 		t.Fatalf("Decode after empty: %s", err)
 	}
 	if resp.Error == nil {
-		t.Fatalf("Expected error, got nil")
+		t.Fatal("Expected error, got nil")
 	}
 }
 
 func TestServer(t *testing.T) {
+	t.Parallel()
 	cli, srv := net.Pipe()
-	defer cli.Close()
-	go ServeConn(srv)
+	t.Cleanup(func() { cli.Close() })
+	go jsonrpc2.ServeConn(srv)
 	dec := json.NewDecoder(cli)
 
 	// Send hand-coded requests to server, parse responses.
@@ -120,13 +131,14 @@ func TestServer(t *testing.T) {
 }
 
 func TestClient(t *testing.T) {
+	t.Parallel()
 	// Assume server is okay (TestServer is above).
 	// Test client against server.
 	cli, srv := net.Pipe()
-	go ServeConn(srv)
+	go jsonrpc2.ServeConn(srv)
 
-	client := NewClient(cli)
-	defer client.Close()
+	client := jsonrpc2.NewClient(cli)
+	t.Cleanup(func() { client.Close() })
 
 	// Synchronous calls
 	args := &Args{7, 8}
@@ -179,27 +191,29 @@ func TestClient(t *testing.T) {
 	// expect an error: zero divide
 	if err == nil {
 		t.Error("Div: expected error")
-	} else if ServerError(err).Message != "divide by zero" {
+	} else if jsonrpc2.ServerError(err).Message != "divide by zero" {
 		t.Error("Div: expected divide by zero error; got", err)
 	}
 }
 
 func TestMalformedInput(t *testing.T) {
+	t.Parallel()
 	cli, srv := net.Pipe()
 	go func() {
 		cli.Write([]byte(`{id:1}`)) // invalid json
 		cli.Read(make([]byte, 1024))
 	}()
-	ServeConn(srv) // must return, not loop
+	jsonrpc2.ServeConn(srv) // must return, not loop
 }
 
 func TestMalformedOutput(t *testing.T) {
+	t.Parallel()
 	cli, srv := net.Pipe()
 	go srv.Write([]byte(`{"id":0,"result":null,"error":null}`))
-	go ioutil.ReadAll(srv)
+	go io.ReadAll(srv)
 
-	client := NewClient(cli)
-	defer client.Close()
+	client := jsonrpc2.NewClient(cli)
+	t.Cleanup(func() { client.Close() })
 
 	args := &Args{7, 8}
 	reply := new(Reply)
@@ -210,8 +224,9 @@ func TestMalformedOutput(t *testing.T) {
 }
 
 func TestServerErrorHasNullResult(t *testing.T) {
+	t.Parallel()
 	var out bytes.Buffer
-	sc := NewServerCodec(struct {
+	sc := jsonrpc2.NewServerCodec(struct {
 		io.Reader
 		io.Writer
 		io.Closer
@@ -221,12 +236,13 @@ func TestServerErrorHasNullResult(t *testing.T) {
 		Closer: io.NopCloser(nil),
 	}, nil)
 	r := new(rpc.Request)
-	if err := sc.ReadRequestHeader(r); err != nil {
+	err := sc.ReadRequestHeader(r)
+	if err != nil {
 		t.Fatal(err)
 	}
 	const valueText = "the value we don't want to see"
 	const errorText = "some error"
-	err := sc.WriteResponse(&rpc.Response{
+	err = sc.WriteResponse(&rpc.Response{
 		ServiceMethod: "Method",
 		Seq:           1,
 		Error:         errorText,
@@ -243,14 +259,15 @@ func TestServerErrorHasNullResult(t *testing.T) {
 }
 
 func TestUnexpectedError(t *testing.T) {
+	t.Parallel()
 	cli, srv := myPipe()
-	go cli.PipeWriter.CloseWithError(errors.New("unexpected error")) // reader will get this error
-	go cli.PipeReader.Close()                                        // writer will get ErrClosedPipe
-	ServeConn(srv)                                                   // must return, not loop
+	go cli.PipeWriter.CloseWithError(errUnexpected) // reader will get this error
+	go cli.PipeReader.Close()                       // writer will get ErrClosedPipe
+	jsonrpc2.ServeConn(srv)                         // must return, not loop
 }
 
 // Copied from package net.
-func myPipe() (*pipe, *pipe) {
+func myPipe() (cli, srv *pipe) {
 	r1, w1 := io.Pipe()
 	r2, w2 := io.Pipe()
 
@@ -281,22 +298,22 @@ func (p *pipe) Close() error {
 	return err
 }
 
-func (p *pipe) LocalAddr() net.Addr {
+func (*pipe) LocalAddr() net.Addr {
 	return pipeAddr(0)
 }
 
-func (p *pipe) RemoteAddr() net.Addr {
+func (*pipe) RemoteAddr() net.Addr {
 	return pipeAddr(0)
 }
 
-func (p *pipe) SetTimeout(nsec int64) error {
-	return errors.New("net.Pipe does not support timeouts")
+func (*pipe) SetTimeout(int64) error {
+	return errNoTimeouts
 }
 
-func (p *pipe) SetReadTimeout(nsec int64) error {
-	return errors.New("net.Pipe does not support timeouts")
+func (*pipe) SetReadTimeout(int64) error {
+	return errNoTimeouts
 }
 
-func (p *pipe) SetWriteTimeout(nsec int64) error {
-	return errors.New("net.Pipe does not support timeouts")
+func (*pipe) SetWriteTimeout(int64) error {
+	return errNoTimeouts
 }
